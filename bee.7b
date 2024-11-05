@@ -1,0 +1,60 @@
+crate=simzip
+crates_dir=../../rust_util/src/rust/crates
+dep_crates=[]
+
+target test {
+	dependency{target(compile test)}
+	exec src/test (~args~)
+}
+
+target compile test:src {
+   dependency{ target(simple_zip)}
+   dependency {
+       or {
+       anynewer(../bee.7b,test)
+       anynewer(${~cwd~}/test.rs,${~cwd~}/test)
+       }
+   }
+
+   display(Compiling test ...)
+   exec rustc::  (
+       --color, always,
+       -L,all=${crates_dir},
+       --extern, simzip,
+       -o,
+       test,
+       test.rs
+   )
+     if {
+         neq(~~, 0)
+         then {
+            panic("compilation error(s)")
+         }
+     }
+}
+
+
+target simple_zip:src {
+    dependency{
+    	anynewer(${~cwd~}/*.rs,${crates_dir}/lib${crate}.rlib)
+    }
+	display(Building crate ${crate} in ${crates_dir}/lib${crate}.rlib)
+	exec rustc::  (
+	  --color, always,
+	 -C, opt-level=2,
+	 -L, crates_dir,
+	 --crate-type=lib,
+	 --edition, 2021,
+	 dep_crates,
+	 --crate-name, crate,
+    --out-dir, crates_dir,
+     #-o, ../crates/crate/lib${crate}.rlib,
+     lib.rs
+   )
+   if {
+         neq(${~~}, 0)
+         then {
+            panic("${crate} compilation error(s)")
+         }
+   }
+}
