@@ -2,8 +2,20 @@ use std::collections::HashSet;
 use crate::simzip::Location::Mem;
 use std::path::Path;
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum Compression {
-    Stored,
+    #[default]
+    Store,
+    Shrink,
+    Reduction(u8) , //(This implies compression factors ranging from level 1 to level 4)
+    Implode,
+    Deflate,
+    Deflat64,
+    BZIP2,
+    LZMA, 
+    WavPack,
+    PPMd ,
 }
 
 pub enum Location {
@@ -37,7 +49,7 @@ impl ZipInfo {
     pub fn new(name: String) -> ZipInfo {
         ZipInfo {
             zip_name: name,
-            compression: Compression::Stored,
+            compression: Compression::Store,
             comment: None,
             entries: vec![]
         }
