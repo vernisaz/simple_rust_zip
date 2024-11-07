@@ -1,9 +1,10 @@
 crate=simzip
 crates_dir=../../rust_util/src/rust/crates
-dep_crates=[]
+dep_crates=[--extern,time=${crates_dir}/libtime.rlib]
 
 target test {
 	dependency{target(compile test)}
+	dependency{}
 	exec src/test (~args~)
 }
 
@@ -13,6 +14,7 @@ target compile test:src {
        or {
        anynewer(../bee.7b,test)
        anynewer(${~cwd~}/test.rs,${~cwd~}/test)
+       anynewer(${crates_dir}/lib${crate}.rlib,${~cwd~}/test)
        }
    }
 
