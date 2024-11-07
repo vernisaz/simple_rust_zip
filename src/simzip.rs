@@ -114,10 +114,14 @@ impl ZipInfo {
             let crc_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
             len = zip_file.write(&crc.to_ne_bytes()).map_err(|e| format!("{e}"))?; 
             assert_eq!(len, 4);
-            let mut size_compressed = 0_u64;
+            let mut size_compressed = match &entry.data { 
+                Location::Mem(mem) => mem.len() as u64,
+                Location::Disk(ref path) => fs::metadata(&*path).map_err(|e| "no metadata".to_string())?.
+                      len()
+            };
             len = zip_file.write(&(size_compressed as u32).to_ne_bytes()).map_err(|e| format!("{e}"))?; 
             assert_eq!(len, 4);
-            let size = 0_u64;
+            let size = size_compressed;
             len = zip_file.write(&(size as u32).to_ne_bytes()).map_err(|e| format!("{e}"))?; 
             assert_eq!(len, 4);
             let name_bytes = entry.name.as_bytes();
