@@ -37,7 +37,8 @@ pub enum Attribute {
 pub struct ZipEntry {
     pub name: String,
     pub path: Option<String>,
-    pub len: usize, // compressed
+    len: u32, // compressed
+    crc: u32,
     pub attributes: HashSet<Attribute>,
     pub compression: Compression,
     data: Location, // includes len uncompressed (original)
@@ -49,6 +50,8 @@ pub struct ZipInfo {
     pub comment: Option<String>,
     entries: Vec<ZipEntry>,
 }
+
+static VER_EXTRACT: u16 = 0x14;
 
 impl Compression {
     fn value(&self) -> u16 {
@@ -72,50 +75,95 @@ impl Compression {
 // info: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip-printable.html
 impl ZipEntry {
-    fn store(&self, mut zip_file: &File) -> Result<usize, String> {
+    fn store(&mut self, mut zip_file: &File) -> Result<usize, String> {
         let mut res = 0_usize;
-        let mut len = zip_file.write(&(0x06054b50_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        let mut len = zip_file.write(&(0x504b0304_u32 .to_be_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 4);
         res += len;
-        len = zip_file.write(&0x14_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // version 2.0
+        len = zip_file.write(&VER_EXTRACT.to_ne_bytes()).map_err(|e| format!("{e}"))?; // version 2.0
         assert_eq!(len, 2);
         res += len;
         // flags
+        // set to 0x08 and then add data descriptor after data 3x4 bytes
         len = zip_file.write(&0_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // flags
         assert_eq!(len, 2);
         res += len;
-        len = zip_file.write(&Compression::Store.value().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&self.compression.value().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 2);
         res += len;
+        let (comm_len,crc_pos) = self.write_common(&zip_file)?;
+        len = comm_len;
+        res += len;
+        // writing content 
+        match &self.data {
+            Location::Mem(mem) => {
+                len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                // compressed len
+                self.len = len as u32;
+                assert_eq!(len, self.len as usize);
+                res += len;
+                self.crc = crc32::update_slow(u32::MAX, &mem)
+            }
+            Location::Disk(_path) => {
+                
+            }
+        }
+        // update crc 
+        let current_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
+        zip_file.seek(std::io::SeekFrom::Start(crc_pos)).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&self.crc.to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        assert_eq!(len, 4);
+        len = zip_file.write(&self.len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // compressed len
+        assert_eq!(len, 4);
+        
+        zip_file.seek(std::io::SeekFrom::Start(current_pos)).map_err(|e| format!("{e}"))?;
+        Ok(res)
+    }
+    
+    fn store_dir(&self, mut zip_file: &File) -> Result<(), String> {
+        let mut len = zip_file.write(&(0x02014b50_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        assert_eq!(len, 4);
+        len = zip_file.write(&(3_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+        assert_eq!(len, 2);
+        len = zip_file.write(&VER_EXTRACT.to_ne_bytes()).map_err(|e| format!("{e}"))?; // version 2.0
+        assert_eq!(len, 2);
+        len = zip_file.write(&0_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // 
+        assert_eq!(len, 2);
+        len = zip_file.write(&self.compression.value().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        assert_eq!(len, 2);
+        self.write_common(zip_file)?;
+        Ok(())
+    }
+    
+    fn write_common(&self, mut zip_file: &File) -> Result<(usize, u64), String> {
+        let mut res = 0_usize;
         let (y,m,d,h,min,s,_) = match &self.data { 
-            Location::Mem(mem) => time::get_datetime(1970, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()),
-            Location::Disk(ref path) => time::get_datetime(1970, fs::metadata(&*path).map_err(|e| "no metadata".to_string())?.
-                  modified().map_err(|e| "no modified".to_string())?.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()),
+            Location::Mem(_) => time::get_datetime(1970, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()),
+            Location::Disk(ref path) => time::get_datetime(1970, fs::metadata(&*path).map_err(|e| format!{"no metadata {e}"})?.
+                  modified().map_err(|e| format!{"no modified {e}"})?.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs()),
             };
         let time: u16 = (s/2 + (min << 4) + (h << 11)).try_into().unwrap();
-        len = zip_file.write(&time.to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        let mut len = zip_file.write(&time.to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
         let date: u16 = (d + (m << 4) + ((y-1980) << 9)).try_into().unwrap();
         len = zip_file.write(&date.to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
-        let mut crc: u32 = crc32::update_slow(0xdebb20e3, &0_i32.to_ne_bytes());
         let crc_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
-        len = zip_file.write(&crc.to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&(self.crc.to_ne_bytes())).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 4);
         res += len;
         // preserve the position to update size after finishing data
-        let mut size_compressed = match &self.data { 
+        let size_orig = match &self.data { 
             Location::Mem(mem) => mem.len() as u64,
-            Location::Disk(ref path) => fs::metadata(&*path).map_err(|e| "no metadata".to_string())?.
+            Location::Disk(ref path) => fs::metadata(&*path).map_err(|e| format!{"no metadata {e}"})?.
                   len()
         };
-        len = zip_file.write(&(size_compressed as u32).to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&(self.len as u32).to_le_bytes()).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 4);
         res += len;
-        let size = size_compressed;
-        len = zip_file.write(&(size as u32).to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&(size_orig as u32).to_le_bytes()).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 4);
         res += len;
         let name_bytes = self.name.as_bytes();
@@ -129,32 +177,7 @@ impl ZipEntry {
         len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
         assert_eq!(len, name_bytes.len());
         res += len;
-        // writing content 
-        match &self.data {
-            Location::Mem(mem) => {
-                len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
-                assert_eq!(len, size_compressed as usize);
-                res += len;
-                crc = crc32::update_slow(crc, &mem)
-            }
-            Location::Disk(_path) => {
-                
-            }
-        }
-        // update crc 
-        let current_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
-        zip_file.seek(std::io::SeekFrom::Start(crc_pos)).map_err(|e| format!("{e}"))?;
-        len = zip_file.write(&crc.to_ne_bytes()).map_err(|e| format!("{e}"))?; 
-        assert_eq!(len, 4);
-        res += len;
-        zip_file.seek(std::io::SeekFrom::Start(current_pos)).map_err(|e| format!("{e}"))?;
-        Ok(res)
-    }
-    
-    fn store_dir(&self, mut zip_file: &File) -> Result<u64, String> {
-        let mut len = zip_file.write(&(0x02014b50_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
-        assert_eq!(len, 4);
-        Ok(0)
+        Ok((res,crc_pos))
     }
 }
 
@@ -167,16 +190,24 @@ impl ZipInfo {
         }
     }
     
+    pub fn new_with_comment(name: String, comment: String) -> ZipInfo {
+        ZipInfo {
+            zip_name: name,
+            comment: Some(comment),
+            entries: vec![]
+        }
+    }
+    
     pub fn add(&mut self, entry: ZipEntry) {
         self.entries.push(entry)
     }
     
-    pub fn store(&self) -> Result<(), String> {
+    pub fn store(&mut self) -> Result<(), String> {
         // consider to create with zip_name.<8 random digits>  and rename to zip_name at the end
         // use : little-endian byte order
         let mut zip_file = File::create(&self.zip_name).map_err(|e| format!("{e}"))?;
         
-        for entry in &self.entries {
+        for entry in &mut self.entries {
             entry.store(&zip_file)?;
         }
         for entry in &self.entries {
@@ -206,7 +237,7 @@ impl ZipInfo {
         assert_eq!(len, 4);
         let comment_bytes = if let Some(comment) = &self.comment {
            comment.as_bytes() } else { &[] };
-        len = zip_file.write(&(comment_bytes.len() .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&((comment_bytes.len() as u16).to_ne_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         if comment_bytes.len() > 0 {
             len = zip_file.write(&comment_bytes).map_err(|e| format!("{e}"))?;
@@ -222,7 +253,7 @@ impl ZipEntry {
             name: name,
             path: None,
             compression: Default::default(),
-            len: 0,
+            len: 0, crc: Default::default(),
             attributes: HashSet::new(),
             data: Mem(data)
         }
