@@ -102,7 +102,7 @@ impl ZipEntry {
                 self.len = len as u32;
                 assert_eq!(len, self.len as usize);
                 res += len;
-                self.crc = crc32::update_slow(u32::MAX, &mem)
+                self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)
             }
             Location::Disk(_path) => {
                 
@@ -171,7 +171,7 @@ impl ZipEntry {
         assert_eq!(len, 2);
         res += len;
         let extra_len = 0_u16;
-        len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
         res += len;
         len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
