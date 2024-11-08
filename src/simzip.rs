@@ -199,7 +199,7 @@ impl ZipEntry {
         let mut len = zip_file.write(&time.to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
-        let date: u16 = (d + (m << 4) + ((y-1980) << 9)).try_into().unwrap();
+        let date: u16 = (d + (m << 5) + ((y-1980) << 9)).try_into().unwrap();
         len = zip_file.write(&date.to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
@@ -265,7 +265,7 @@ impl ZipInfo {
         // disk
         len = zip_file.write(&(0_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
-        //
+        // disk # the dir starts
         len = zip_file.write(&(0_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         // entries # this disk
