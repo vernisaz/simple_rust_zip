@@ -133,52 +133,59 @@ impl ZipEntry {
         Ok(res)
     }
     
-    fn store_dir(&self, mut zip_file: &File) -> Result<(), String> {
+    fn store_dir(&self, mut zip_file: &File) -> Result<u32, String> {
+        let mut res = 0_usize;
         let mut len = zip_file.write(&(0x02014b50_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 4);
-        len = zip_file.write(&(3_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+        res += len;
+        len = zip_file.write(&(0x0300_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
         assert_eq!(len, 2);
+        res += len;
         len = zip_file.write(&VER_EXTRACT.to_ne_bytes()).map_err(|e| format!("{e}"))?; // version 2.0
         assert_eq!(len, 2);
+        res += len;
         len = zip_file.write(&0_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // 
         assert_eq!(len, 2);
+        res += len;
         len = zip_file.write(&self.compression.value().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 2);
-        self.write_common(zip_file)?;
+        res += len;
+        res += self.write_common(zip_file)?.0;
         
         let name_bytes = self.name.as_bytes();
         len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
-        
+        res += len;
         let extra_len = 0_u16;
         len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
-        
+        res += len;
         let comment_len = 0_u16;
         len = zip_file.write(&comment_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
-        
+        res += len;
         let disk_no = 0_u16;
         len = zip_file.write(&disk_no.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
-        
+        res += len;
         let intern_attr = 0_u16;
         len = zip_file.write(&intern_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
-        
+        res += len;
         let ext_attr = 0_u32;
         len = zip_file.write(&ext_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 4);
-        
+        res += len;
         let file_hdr_off = 0_u32;
         len = zip_file.write(&file_hdr_off.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 4);
-        
+        res += len;
         len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
         assert_eq!(len, name_bytes.len());
-        
+        res += len;
         // probably write extra here
-        Ok(())
+        
+        Ok(res as u32)
     }
     
     fn write_common(&self, mut zip_file: &File) -> Result<(usize, u64), String> {
@@ -247,10 +254,11 @@ impl ZipInfo {
         for entry in &mut self.entries {
             entry.store(&zip_file)?;
         }
-        for entry in &self.entries {
-            entry.store_dir(&zip_file)?;
-        }
         let mut len_central = 0_u32;
+        for entry in &self.entries {
+            len_central += entry.store_dir(&zip_file)?;
+        }
+        
         // add - end of central directory record
         let mut len = zip_file.write(&(0x06054b50_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 4);
