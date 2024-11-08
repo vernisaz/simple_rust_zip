@@ -94,6 +94,19 @@ impl ZipEntry {
         let (comm_len,crc_pos) = self.write_common(&zip_file)?;
         len = comm_len;
         res += len;
+        
+        let name_bytes = self.name.as_bytes();
+        len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        assert_eq!(len, 2);
+        res += len;
+        let extra_len = 0_u16;
+        len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        assert_eq!(len, 2);
+        res += len;
+        len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
+        assert_eq!(len, name_bytes.len());
+        res += len;
+        
         // writing content 
         match &self.data {
             Location::Mem(mem) => {
@@ -132,6 +145,39 @@ impl ZipEntry {
         len = zip_file.write(&self.compression.value().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 2);
         self.write_common(zip_file)?;
+        
+        let name_bytes = self.name.as_bytes();
+        len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        assert_eq!(len, 2);
+        
+        let extra_len = 0_u16;
+        len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        assert_eq!(len, 2);
+        
+        let comment_len = 0_u16;
+        len = zip_file.write(&comment_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        assert_eq!(len, 2);
+        
+        let disk_no = 0_u16;
+        len = zip_file.write(&disk_no.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        assert_eq!(len, 2);
+        
+        let intern_attr = 0_u16;
+        len = zip_file.write(&intern_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        assert_eq!(len, 2);
+        
+        let ext_attr = 0_u32;
+        len = zip_file.write(&ext_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        assert_eq!(len, 4);
+        
+        let file_hdr_off = 0_u32;
+        len = zip_file.write(&file_hdr_off.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        assert_eq!(len, 4);
+        
+        len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
+        assert_eq!(len, name_bytes.len());
+        
+        // probably write extra here
         Ok(())
     }
     
@@ -166,17 +212,8 @@ impl ZipEntry {
         len = zip_file.write(&(size_orig as u32).to_le_bytes()).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 4);
         res += len;
-        let name_bytes = self.name.as_bytes();
-        len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
-        assert_eq!(len, 2);
-        res += len;
-        let extra_len = 0_u16;
-        len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
-        assert_eq!(len, 2);
-        res += len;
-        len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
-        assert_eq!(len, name_bytes.len());
-        res += len;
+        
+        
         Ok((res,crc_pos))
     }
 }
