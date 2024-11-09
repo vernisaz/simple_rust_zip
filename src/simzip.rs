@@ -2,9 +2,10 @@ use std::collections::HashSet;
 use crate::simzip::Location::Mem;
 use std::path::Path;
 use std::fs::{self, File};
-use std::io::{Write, Seek};
+use std::io::{Write, Seek, Read};
 use std::time::{SystemTime};
 use crate::crc32;
+use crate::simzip::Location::Disk;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -35,6 +36,7 @@ impl Default for Location {
         Location::Mem(vec![])
     }
 }
+
 #[derive(Debug)]
 pub enum Attribute {
     Exec,
@@ -46,8 +48,8 @@ pub struct ZipEntry {
     pub name: String,
     pub path: Option<String>,
     len: u32, // compressed
-    crc: u32,
-    offset: u32,
+    crc: u32, // crc32
+    offset: u32, // a header offset in zip
     pub attributes: HashSet<Attribute>,
     pub compression: Compression,
     data: Location, // includes len uncompressed (original)
@@ -105,8 +107,11 @@ impl ZipEntry {
         let (comm_len,crc_pos) = self.write_common(&zip_file)?;
         len = comm_len;
         res += len;
-        
-        let name_bytes = self.name.as_bytes();
+        let combined_name = match &self.path {
+            Some(path) => path.to_owned() + "/" + &self.name,
+            None => self.name.clone()
+        };
+        let name_bytes = combined_name.as_bytes();
         len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
@@ -128,8 +133,16 @@ impl ZipEntry {
                 res += len;
                 self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)
             }
-            Location::Disk(_path) => {
-                
+            Location::Disk(path) => {
+            // TODO consider a streaming way
+                let mut f = File::open(&**path).map_err(|e| format!("{e}"))?;
+                let mut mem = vec![];
+                  f.read_to_end(&mut mem).map_err(|e| format!("{e}"))?;
+                len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                self.len = len as u32;
+                assert_eq!(len, self.len as usize);
+                res += len;
+                self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)
             }
         }
         // update crc , save current pos
@@ -163,8 +176,12 @@ impl ZipEntry {
         assert_eq!(len, 2);
         res += len;
         res += self.write_common(zip_file)?.0;
-        
-        let name_bytes = self.name.as_bytes();
+        // TODO reuse previous calculation
+        let combined_name = match &self.path {
+            Some(path) => path.to_owned() + "/" + &self.name,
+            None => self.name.clone()
+        };
+        let name_bytes = combined_name.as_bytes();
         len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
@@ -312,6 +329,16 @@ impl ZipEntry {
             path: None,
             attributes: HashSet::new(),
             data: Mem(data), ..Default::default()
+        }
+    }
+    
+    pub fn from_file(path: &String, zip_path: Option<&String>) -> ZipEntry {
+        let p = Path::new(path);
+        ZipEntry {
+            name: p.file_name().unwrap().to_str().unwrap().to_string(),
+            path: zip_path.cloned(),
+            attributes: HashSet::new(),
+            data: Disk(Box::new(p)), ..Default::default()
         }
     }
 }
