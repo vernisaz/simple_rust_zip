@@ -127,23 +127,34 @@ impl ZipEntry {
         // writing content 
         match &self.data {
             Location::Mem(mem) => {
-                len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                match self.compression {
+                    Compression::Store => {
+                        len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                        self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)
+                    }
+                    _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
+                }
                 // compressed len
                 self.len = len as u32;
                 assert_eq!(len, self.len as usize);
                 res += len;
-                self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)
             }
             Location::Disk(path) => {
             // TODO consider a streaming way
                 let mut f = File::open(&**path).map_err(|e| format!("{e}"))?;
                 let mut mem = vec![];
                   f.read_to_end(&mut mem).map_err(|e| format!("{e}"))?;
-                len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                match self.compression {
+                    Compression::Store => {
+                
+                      len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                      self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)  
+                    }
+                    _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
+                }
                 self.len = len as u32;
                 assert_eq!(len, self.len as usize);
                 res += len;
-                self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)
             }
         }
         // update crc , save current pos
@@ -164,7 +175,7 @@ impl ZipEntry {
         let mut len = zip_file.write(&(0x02014b50_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 4);
         res += len;
-        len = zip_file.write(&(0x0300_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+        len = zip_file.write(&(0x033F_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
         assert_eq!(len, 2);
         res += len;
         len = zip_file.write(&VER_EXTRACT.to_ne_bytes()).map_err(|e| format!("{e}"))?; // version 2.0
