@@ -24,21 +24,30 @@ pub enum Compression {
     PPMd ,
 }
 
+#[derive(Debug)]
 pub enum Location {
     Disk(Box<Path>),
     Mem(Vec<u8>),
 }
 
+impl Default for Location {
+    fn default() -> Location {
+        Location::Mem(vec![])
+    }
+}
+#[derive(Debug)]
 pub enum Attribute {
     Exec,
     Write
 }
 
+#[derive(Debug, Default)]
 pub struct ZipEntry {
     pub name: String,
     pub path: Option<String>,
     len: u32, // compressed
     crc: u32,
+    offset: u32,
     pub attributes: HashSet<Attribute>,
     pub compression: Compression,
     data: Location, // includes len uncompressed (original)
@@ -77,6 +86,8 @@ impl Compression {
 impl ZipEntry {
     fn store(&mut self, mut zip_file: &File) -> Result<usize, String> {
         let mut res = 0_usize;
+        // TODO impl zip64
+        self.offset = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))? as u32;
         let mut len = zip_file.write(&(0x504b0304_u32 .to_be_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 4);
         res += len;
@@ -176,8 +187,8 @@ impl ZipEntry {
         len = zip_file.write(&ext_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 4);
         res += len;
-        let file_hdr_off = 0_u32;
-        len = zip_file.write(&file_hdr_off.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        // no calculation based on multi disks
+        len = zip_file.write(&self.offset.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 4);
         res += len;
         len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
@@ -297,10 +308,10 @@ impl ZipEntry {
         ZipEntry {
             name: name,
             path: None,
-            compression: Default::default(),
-            len: 0, crc: Default::default(),
+          //  compression: Default::default(),
+            //len: 0, crc: Default::default(),
             attributes: HashSet::new(),
-            data: Mem(data)
+            data: Mem(data), ..Default::default()
         }
     }
 }
