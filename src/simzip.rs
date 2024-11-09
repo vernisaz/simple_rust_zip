@@ -27,7 +27,7 @@ pub enum Compression {
 
 #[derive(Debug)]
 pub enum Location {
-    Disk(Box<Path>),
+    Disk(String),
     Mem(Vec<u8>),
 }
 
@@ -338,7 +338,7 @@ impl ZipEntry {
             name: p.file_name().unwrap().to_str().unwrap().to_string(),
             path: zip_path.cloned(),
             attributes: HashSet::new(),
-            data: Disk(Box::new(p)), ..Default::default()
+            data: Disk(path.to_owned()), ..Default::default()
         }
     }
 }

@@ -4,7 +4,7 @@ fn main() {
     zip.add(simzip::ZipEntry::new(".gitignore".into(), r#"tsrc/test
 test.zip"#.as_bytes().to_vec()));
     zip.add(simzip::ZipEntry::new("test entry.txt".into(), "test content".as_bytes().to_vec()));
-    zip.add(simzip::ZipEntry::from_file("README.md", Some("doc")));
+    zip.add(simzip::ZipEntry::from_file(&"README.md".to_string(), Some(&"doc".to_string())));
     match zip.store() {
         Ok(()) => println!{"Zipped good!"},
         Err(msg) => println!{"zip error: {msg}"}
