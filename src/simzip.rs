@@ -132,8 +132,9 @@ impl ZipEntry {
                 
             }
         }
-        // update crc 
+        // update crc , save current pos
         let current_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
+        
         zip_file.seek(std::io::SeekFrom::Start(crc_pos)).map_err(|e| format!("{e}"))?;
         len = zip_file.write(&self.crc.to_ne_bytes()).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 4);
@@ -266,6 +267,7 @@ impl ZipInfo {
             entry.store(&zip_file)?;
         }
         let mut len_central = 0_u32;
+        let offset_central_dir = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
         for entry in &self.entries {
             len_central += entry.store_dir(&zip_file)?;
         }
@@ -289,7 +291,7 @@ impl ZipInfo {
         len= zip_file.write(&(len_central .to_ne_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 4);
         // offset central
-        len = zip_file.write(&(0_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&((offset_central_dir as u32) .to_ne_bytes())).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 4);
         let comment_bytes = if let Some(comment) = &self.comment {
            comment.as_bytes() } else { &[] };
@@ -308,8 +310,6 @@ impl ZipEntry {
         ZipEntry {
             name: name,
             path: None,
-          //  compression: Default::default(),
-            //len: 0, crc: Default::default(),
             attributes: HashSet::new(),
             data: Mem(data), ..Default::default()
         }
