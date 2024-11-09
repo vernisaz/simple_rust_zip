@@ -47,12 +47,13 @@ pub enum Attribute {
 pub struct ZipEntry {
     pub name: String,
     pub path: Option<String>,
-    len: u32, // compressed
-    crc: u32, // crc32
-    offset: u32, // a header offset in zip
+    pub comment: Option<String>,
     pub attributes: HashSet<Attribute>,
     pub compression: Compression,
     data: Location, // includes len uncompressed (original)
+    len: u32, // compressed
+    crc: u32, // crc32
+    offset: u32, // a header offset in zip
 }
 
 pub struct ZipInfo {
@@ -189,8 +190,13 @@ impl ZipEntry {
         len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
         res += len;
-        let comment_len = 0_u16;
-        len = zip_file.write(&comment_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        
+        let comment = match &self.comment {
+            Some(comment) => {comment.clone()},
+            None => "".to_string()
+        };
+        let comment_bytes = comment.as_bytes();
+        len = zip_file.write(&(comment_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
         res += len;
         let disk_no = 0_u16;
@@ -213,7 +219,12 @@ impl ZipEntry {
         assert_eq!(len, name_bytes.len());
         res += len;
         // probably write extra here
-        
+        // comment
+        if comment_bytes.len() > 0 {
+           len = zip_file.write(&comment_bytes).map_err(|e| format!("{e}"))?;
+            assert_eq!(len, comment_bytes.len());
+            res += len; 
+        }
         Ok(res as u32)
     }
     
