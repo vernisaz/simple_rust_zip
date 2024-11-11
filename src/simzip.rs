@@ -200,14 +200,7 @@ impl ZipEntry {
         len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
-        let mut extra_len = 0_u16;
-        if self.modified > 0 {
-            extra_len += 4 + 13;
-        }
-        if self.attributes.len() > 0 {
-            extra_len += 4 + 11;
-        }
-        extra_len = 0;
+        let extra_len = 0_u16; // no extra len, maybe add Info-ZIP UNIX (newer UID/GID) in future
         len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
         res += len;
@@ -228,7 +221,15 @@ impl ZipEntry {
         len = zip_file.write(&intern_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
         res += len;
-        let ext_attr = 0_u32;
+        let mut ext_attr = 0x81000000_u32;
+        let mut perm = 0o333_u8;
+        if self.attributes.contains(&Attribute::NoWrite) {
+            perm &= 0o155;
+        }
+        if self.attributes.contains(&Attribute::Exec) {
+            perm |= 0o44;
+        }
+        ext_attr |= (perm as u32) << 16;
         len = zip_file.write(&ext_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 4);
         res += len;
@@ -283,7 +284,7 @@ impl ZipEntry {
                 time::get_datetime(1970, current.as_secs())
             }
             Location::Disk(ref path) => {
-                let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata {e}"})?;
+                let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;
                 if metadata.permissions().readonly() {
                     self.attributes.insert(Attribute::NoWrite);
                 }
@@ -312,7 +313,7 @@ impl ZipEntry {
         // preserve the position to update size after finishing data
         let size_orig = match &self.data { 
             Location::Mem(mem) => mem.len() as u64,
-            Location::Disk(ref path) => fs::metadata(&*path).map_err(|e| format!{"no metadata {e}"})?.
+            Location::Disk(ref path) => fs::metadata(&*path).map_err(|e| format!{"no metadata for {path} -  {e}"})?.
                   len()
         };
         len = zip_file.write(&(self.len as u32).to_le_bytes()).map_err(|e| format!("{e}"))?; 
