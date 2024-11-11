@@ -5,6 +5,9 @@ fn main() {
 test.zip"#.as_bytes().to_vec()));
     zip.add(simzip::ZipEntry::new("test entry.txt".into(), "test content".as_bytes().to_vec()));
     zip.add(simzip::ZipEntry::from_file(&"README.md".to_string(), Some(&"doc".to_string())));
+    #[cfg(feature = "test_unix")]
+    {zip.add(simzip::ZipEntry::from_file(&"run script.sh".to_string(), Some(&"test".to_string())));
+    zip.add(simzip::ZipEntry::from_file(&"read only.txt".to_string(), Some(&"test".to_string())));}
     match zip.store() {
         Ok(()) => println!{"Zipped good!"},
         Err(msg) => println!{"zip error: {msg}"}
