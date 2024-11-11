@@ -222,12 +222,12 @@ impl ZipEntry {
         assert_eq!(len, 2);
         res += len;
         let mut ext_attr = 0x81000000_u32;
-        let mut perm = 0o333_u8;
+        let mut perm = 0o266_u8;
         if self.attributes.contains(&Attribute::NoWrite) {
             perm &= 0o155;
         }
         if self.attributes.contains(&Attribute::Exec) {
-            perm |= 0o44;
+            perm |= 0o111;
         }
         ext_attr |= (perm as u32) << 16;
         len = zip_file.write(&ext_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
