@@ -29,3 +29,12 @@ match zip.store() {
     }
 ```
 The underline code will automatically add permissions on UNIX systems.
+
+## Building the crate
+
+The building is using RustBee. It's an alternative tool to Cargo. You may need to build it first. 
+The building is clearly simple and explanid [here](https://gitlab.com/tools6772135/rusthub/-/blob/master/src/rust/rustcgi/README.md).
+The crate has one dependency. It gets build as a part of a building of RustBee. Just verify that the right RustBee repository location is
+specified in [bee.7b](https://github.com/vernisaz/simple_rust_zip/blob/ce7bf7385eef7d8bd84690b7fefe82f2a0275d9f/bee.7b#L2).
+
+**rb** will produse a build.
