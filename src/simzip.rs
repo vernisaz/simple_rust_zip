@@ -144,9 +144,9 @@ impl ZipEntry {
             }
             Location::Disk(path) => {
             // TODO consider a streaming way
-                let mut f = File::open(&**path).map_err(|e| format!("{e}"))?;
+                let mut f = File::open(&**path).map_err(|e| format!("file: {path} - {e}"))?;
                 let mut mem = vec![];
-                  f.read_to_end(&mut mem).map_err(|e| format!("{e}"))?;
+                  f.read_to_end(&mut mem).map_err(|e| format!("file: {path} - {e}"))?;
                 match self.compression {
                     Compression::Store => {
                 
@@ -352,7 +352,7 @@ impl ZipInfo {
     pub fn store(&mut self) -> Result<(), String> {
         // consider to create with zip_name.<8 random digits>  and rename to zip_name at the end
         // use : little-endian byte order
-        let mut zip_file = File::create(&self.zip_name).map_err(|e| format!("{e}"))?;
+        let mut zip_file = File::create(&self.zip_name).map_err(|e| format!("file: {} - {e}", &self.zip_name))?;
         
         for entry in &mut self.entries {
             entry.store(&zip_file)?;
