@@ -4,6 +4,7 @@ use std::path::Path;
 use std::fs::{self, File};
 use std::io::{Write, Seek, Read};
 use std::time::{SystemTime};
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use crate::crc32;
@@ -45,6 +46,12 @@ pub enum Attribute {
     NoWrite
 }
 
+#[derive(PartialEq, Eq, Hash)]
+struct DirEntry {
+    name: String,
+    path: Option<String>,
+}
+
 #[derive(Debug, Default)]
 pub struct ZipEntry {
     pub name: String,
@@ -59,9 +66,10 @@ pub struct ZipEntry {
     modified: u64,
 }
 
+#[derive(Default)]
 pub struct ZipInfo {
     pub zip_name: String,
-    
+    directory: Option<HashSet<DirEntry>>,
     pub comment: Option<String>,
     entries: Vec<ZipEntry>,
 }
@@ -333,7 +341,7 @@ impl ZipInfo {
         ZipInfo {
             zip_name: name,
             comment: None,
-            entries: vec![]
+            ..Default::default()
         }
     }
     
@@ -341,12 +349,31 @@ impl ZipInfo {
         ZipInfo {
             zip_name: name,
             comment: Some(comment),
-            entries: vec![]
+            ..Default::default()
         }
     }
     
-    pub fn add(&mut self, entry: ZipEntry) {
-        self.entries.push(entry)
+    pub fn prohibit_duplicates(&mut self) {
+        self.directory = Some(HashSet::new())
+    }
+    
+    pub fn add(&mut self, entry: ZipEntry) -> bool {
+        match &mut self.directory {
+            None => {
+                self.entries.push(entry);
+                true
+            }
+            Some(dir) => {
+                let dir_entry = DirEntry {
+                    name: entry.name.to_owned(),
+                    path: entry.path.to_owned()
+                };
+                if dir.insert(dir_entry) {
+                    self.entries.push(entry);
+                    true
+                } else {false}
+            }
+        }
     }
     
     pub fn store(&mut self) -> Result<(), String> {
