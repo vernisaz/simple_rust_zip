@@ -4,6 +4,8 @@ use std::path::Path;
 use std::fs::{self, File};
 use std::io::{Write, Seek, Read};
 use std::time::{SystemTime};
+use std::hash::{Hash, Hasher};
+use std::cell::Cell;
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -61,7 +63,7 @@ pub struct ZipEntry {
     pub compression: Compression,
     data: Location, // includes len uncompressed (original)
     len: u32, // compressed
-    crc: u32, // crc32
+    crc: Cell<u32>, // crc32
     offset: u32, // a header offset in zip
     modified: u64,
 }
@@ -141,7 +143,7 @@ impl ZipEntry {
                 match self.compression {
                     Compression::Store => {
                         len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
-                        self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)
+                        self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
                     _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
                 }
@@ -159,7 +161,7 @@ impl ZipEntry {
                     Compression::Store => {
                 
                       len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
-                      self.crc = crc32::update_slow(0/*u32::MAX*/, &mem)  
+                      self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()  
                     }
                     _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
                 }
@@ -172,7 +174,7 @@ impl ZipEntry {
         let current_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
         
         zip_file.seek(std::io::SeekFrom::Start(crc_pos)).map_err(|e| format!("{e}"))?;
-        len = zip_file.write(&self.crc.to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&self.crc.get().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 4);
         len = zip_file.write(&self.len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // compressed len
         assert_eq!(len, 4);
@@ -315,7 +317,7 @@ impl ZipEntry {
         assert_eq!(len, 2);
         res += len;
         let crc_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
-        len = zip_file.write(&(self.crc.to_ne_bytes())).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&(self.crc.get().to_ne_bytes())).map_err(|e| format!("{e}"))?; 
         assert_eq!(len, 4);
         res += len;
         // preserve the position to update size after finishing data
@@ -443,3 +445,21 @@ impl ZipEntry {
         }
     }
 }
+
+impl PartialEq for ZipEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.path == other.path
+    }
+}
+
+impl Eq for ZipEntry {}
+
+
+impl Hash for ZipEntry {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.path.hash(state);
+    }
+}
+
+
