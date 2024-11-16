@@ -1,11 +1,12 @@
 crate=simzip
-crates_dir=../../rust_util/src/rust/crates
+crates_dir=../../rusthub/src/rust/crates
 dep_crates=[--extern,time=${crates_dir}/libtime.rlib]
 
 target test {
 	dependency{target(compile test)}
 	dependency{}
 	exec src/test (~args~)
+	exec unzip(-t,test)
 }
 
 target compile test:src {
