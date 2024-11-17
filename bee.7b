@@ -1,6 +1,6 @@
 crate=simzip
-crates_dir=../../rusthub/src/rust/crates
-dep_crates=[--extern,time=${crates_dir}/libtime.rlib]
+crates_dir=../../rust_util/src/rust/crates
+dep_crates=[--extern,time=${crates_dir}/libtime.rlib] #,--extern,libdeflater=${crates_dir}/liblibdeflater.rlib]
 
 target test {
 	dependency{target(compile test)}
@@ -24,6 +24,7 @@ target compile test:src {
        --color, always,
        -L,all=${crates_dir},
        --extern, simzip,
+       --cfg, feature="deflate",
        -o,
        test,
        test.rs
@@ -50,8 +51,8 @@ target simple_zip:src {
 	 --edition, 2021,
 	 dep_crates,
 	 --crate-name, crate,
-    --out-dir, crates_dir,
-     #-o, ../crates/crate/lib${crate}.rlib,
+     --out-dir, crates_dir,
+     --cfg, feature="deflate",
      lib.rs
    )
    if {

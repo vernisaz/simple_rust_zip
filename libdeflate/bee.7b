@@ -1,0 +1,95 @@
+# 7bee script for building the daflate dependency
+# check out libdeflate https://github.com/ebiggers/libdeflate
+# run : cmake -B build && cmake --build build
+# check out libdeflater https://github.com/adamkewley/libdeflater
+# copy bee.7b to the libdeflater root directory
+# edit it to specify the common crate location as the crates_dir
+# build - rb
+crate=libdeflater 
+dep crate=libdeflate_sys
+crates_dir=../projects/rust_util/src/rust/crates
+dep_crates=[--extern,libdeflate_sys]
+
+target test {
+	dependency{target(compile test)}
+	dependency{}
+	exec examples/test (~args~)
+}
+
+target compile test:examples {
+   dependency{ target(crate_compile)}
+   dependency {
+       or {
+       anynewer(../bee.7b,test)
+       anynewer(${~cwd~}/gz_compress.rs,${~cwd~}/test)
+       anynewer(../../${crates_dir}/lib${crate}.rlib,${~cwd~}/test)
+       }
+   }
+
+   display(Compiling test ...)
+   exec rustc::  (
+       --color, always,
+       -L,all=../../${crates_dir},
+       --extern, crate,
+       -o,
+       test,
+       gz_compress.rs
+   )
+     if {
+         neq(~~, 0)
+         then {
+            panic("test compilation error(s)")
+         }
+     }
+}
+
+
+target dep_crate_comp:libdeflate-sys/src {
+    dependency{
+    	anynewer(${~cwd~}/*.rs,../../../${crates_dir}/lib${dep crate}.rlib)
+    }
+	display(Building crate ${dep crate} in ${crates_dir}/lib${crate}.rlib)
+	exec rustc::  (
+	  --color, always,
+	 -C, opt-level=0,
+	 --crate-type=lib,
+	 --edition, 2021,
+         -L, ../../../libdeflate/build,
+         -l, static=deflate,
+	 --crate-name, dep crate,
+         --out-dir, ../../../${crates_dir},
+         lib.rs
+   )
+   if {
+         neq(${~~}, 0)
+         then {
+            panic("${dep crate} compilation error(s)")
+         }
+   }
+}
+
+target crate_compile:src {
+    dependency { target(dep_crate_comp)}
+    dependency{
+    	anynewer(${~cwd~}/*.rs,../../${crates_dir}/lib${crate}.rlib)
+    }
+	display(Building crate ${crate} in ${crates_dir}/lib${crate}.rlib)
+	exec rustc::  (
+	  --color, always,
+	 -C, opt-level=0,
+	 -L, ../../${crates_dir},
+	 --crate-type=lib,
+	 --edition, 2021,
+         
+	 dep_crates,
+	 --crate-name, crate,
+        --out-dir, ../../${crates_dir},
+        lib.rs
+   )
+   if {
+         neq(${~~}, 0)
+         then {
+            panic("${crate} compilation error(s)")
+         }
+   }
+}

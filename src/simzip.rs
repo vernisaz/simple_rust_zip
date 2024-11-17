@@ -1,3 +1,7 @@
+#[cfg(feature = "deflate")]
+extern crate libdeflater;
+#[cfg(feature = "deflate")]
+use libdeflater::{Compressor, CompressionLvl};
 use std::collections::HashSet;
 use crate::simzip::Location::Mem;
 use std::path::Path;
@@ -145,11 +149,22 @@ impl ZipEntry {
                         len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
                         self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
+                    #[cfg(feature = "deflate")]
+                    Compression::Deflate => {
+                        let mut compressor = Compressor::new(CompressionLvl::default());
+                        let max_sz = compressor.deflate_compress_bound(mem.len());
+                        let mut compressed_data = Vec::new();
+                        compressed_data.resize(max_sz, 0);
+                        let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).unwrap();
+                        compressed_data.resize(actual_sz, 0);
+                        self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into();
+                        len = zip_file.write(&compressed_data).map_err(|e| format!("{e}"))?;
+                    }
                     _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
                 }
                 // compressed len
                 self.len = len as u32;
-                assert_eq!(len, self.len as usize);
+                assert_eq!(len, self.len as usize);  // redundant
                 res += len;
             }
             Location::Disk(path) => {
