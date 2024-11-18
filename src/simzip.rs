@@ -17,8 +17,9 @@ use crate::crc32;
 use crate::simzip::Location::Disk;
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum Compression {
+    #[cfg_attr(not(feature = "deflate"), default)]
     Store,
     Shrink,
     Reduction1,
@@ -26,6 +27,7 @@ pub enum Compression {
     Reduction3,
     Reduction4,
     Implode,
+    #[cfg_attr(feature = "deflate", default)]
     Deflate,
     Deflat64,
     BZIP2,
@@ -448,16 +450,6 @@ impl ZipInfo {
             assert_eq!(len, comment_bytes.len())
         }
         Ok(())
-    }
-}
-
-impl Default for Compression {
-    fn default() -> Self {
-        if cfg!(feature = "deflate") {
-            Compression::Deflate
-        } else {
-            Compression::Store
-        }
     }
 }
 
