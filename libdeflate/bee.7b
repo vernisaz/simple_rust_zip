@@ -1,4 +1,4 @@
-# 7bee script for building the daflate dependency
+# 7bee (RustBee) script for building the deflate dependency
 # check out libdeflate https://github.com/ebiggers/libdeflate
 # run : cmake -B build && cmake --build build
 # check out libdeflater https://github.com/adamkewley/libdeflater
@@ -7,7 +7,7 @@
 # build - rb
 crate=libdeflater 
 dep crate=libdeflate_sys
-crates_dir=../projects/rust_util/src/rust/crates
+crates_dir=../../projects/rust_util/src/rust/crates
 dep_crates=[--extern,libdeflate_sys]
 
 target test {
@@ -22,14 +22,14 @@ target compile test:examples {
        or {
        anynewer(../bee.7b,test)
        anynewer(${~cwd~}/gz_compress.rs,${~cwd~}/test)
-       anynewer(../../${crates_dir}/lib${crate}.rlib,${~cwd~}/test)
+       anynewer(../${crates_dir}/lib${crate}.rlib,${~cwd~}/test)
        }
    }
 
    display(Compiling test ...)
    exec rustc::  (
        --color, always,
-       -L,all=../../${crates_dir},
+       -L,all=../${crates_dir},
        --extern, crate,
        -o,
        test,
@@ -46,7 +46,7 @@ target compile test:examples {
 
 target dep_crate_comp:libdeflate-sys/src {
     dependency{
-    	anynewer(${~cwd~}/*.rs,../../../${crates_dir}/lib${dep crate}.rlib)
+    	anynewer(${~cwd~}/*.rs,../../${crates_dir}/lib${dep crate}.rlib)
     }
 	display(Building crate ${dep crate} in ${crates_dir}/lib${crate}.rlib)
 	exec rustc::  (
@@ -54,11 +54,11 @@ target dep_crate_comp:libdeflate-sys/src {
 	 -C, opt-level=0,
 	 --crate-type=lib,
 	 --edition, 2021,
-         -L, ../../../libdeflate/build,
-         -l, static=deflate,
+     -L, ../../../libdeflate/build,
+     -l, static=deflate,
 	 --crate-name, dep crate,
-         --out-dir, ../../../${crates_dir},
-         lib.rs
+     --out-dir, ../../${crates_dir},
+     lib.rs
    )
    if {
          neq(${~~}, 0)
@@ -71,20 +71,20 @@ target dep_crate_comp:libdeflate-sys/src {
 target crate_compile:src {
     dependency { target(dep_crate_comp)}
     dependency{
-    	anynewer(${~cwd~}/*.rs,../../${crates_dir}/lib${crate}.rlib)
+    	anynewer(${~cwd~}/*.rs,../${crates_dir}/lib${crate}.rlib)
     }
 	display(Building crate ${crate} in ${crates_dir}/lib${crate}.rlib)
 	exec rustc::  (
 	  --color, always,
 	 -C, opt-level=0,
-	 -L, ../../${crates_dir},
+	 -L, ../${crates_dir},
 	 --crate-type=lib,
 	 --edition, 2021,
          
 	 dep_crates,
 	 --crate-name, crate,
-        --out-dir, ../../${crates_dir},
-        lib.rs
+     --out-dir, ../${crates_dir},
+     lib.rs
    )
    if {
          neq(${~~}, 0)
