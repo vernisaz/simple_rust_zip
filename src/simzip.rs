@@ -17,9 +17,8 @@ use crate::crc32;
 use crate::simzip::Location::Disk;
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Compression {
-    #[default]
     Store,
     Shrink,
     Reduction1,
@@ -147,6 +146,7 @@ impl ZipEntry {
                 match self.compression {
                     Compression::Store => {
                         len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                        assert_eq!(len, mem.len());
                         self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
                     #[cfg(feature = "deflate")]
@@ -157,31 +157,42 @@ impl ZipEntry {
                         compressed_data.resize(max_sz, 0);
                         let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).unwrap();
                         compressed_data.resize(actual_sz, 0);
-                        self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into();
                         len = zip_file.write(&compressed_data).map_err(|e| format!("{e}"))?;
+                        assert_eq!(len, compressed_data.len()); 
+                        self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
                     _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
                 }
                 // compressed len
                 self.len = len as u32;
-                assert_eq!(len, self.len as usize);  // redundant
                 res += len;
             }
             Location::Disk(path) => {
             // TODO consider a streaming way
                 let mut f = File::open(&**path).map_err(|e| format!("file: {path} - {e}"))?;
                 let mut mem = vec![];
-                  f.read_to_end(&mut mem).map_err(|e| format!("file: {path} - {e}"))?;
+                f.read_to_end(&mut mem).map_err(|e| format!("file: {path} - {e}"))?;
                 match self.compression {
                     Compression::Store => {
-                
-                      len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
-                      self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()  
+                          len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                          assert_eq!(len, mem.len());
+                          self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()  
+                    }
+                    #[cfg(feature = "deflate")]
+                    Compression::Deflate => {
+                        let mut compressor = Compressor::new(CompressionLvl::default());
+                        let max_sz = compressor.deflate_compress_bound(mem.len());
+                        let mut compressed_data = Vec::new();
+                        compressed_data.resize(max_sz, 0);
+                        let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).unwrap();
+                        compressed_data.resize(actual_sz, 0);
+                        len = zip_file.write(&compressed_data).map_err(|e| format!("{e}"))?;
+                        assert_eq!(len, compressed_data.len());
+                        self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
                     _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
                 }
                 self.len = len as u32;
-                assert_eq!(len, self.len as usize);
                 res += len;
             }
         }
@@ -437,6 +448,16 @@ impl ZipInfo {
             assert_eq!(len, comment_bytes.len())
         }
         Ok(())
+    }
+}
+
+impl Default for Compression {
+    fn default() -> Self {
+        if cfg!(feature = "deflate") {
+            Compression::Deflate
+        } else {
+            Compression::Store
+        }
     }
 }
 

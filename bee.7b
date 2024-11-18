@@ -1,6 +1,9 @@
 crate=simzip
 crates_dir=../../rust_util/src/rust/crates
 dep_crates=[--extern,time=${crates_dir}/libtime.rlib] #,--extern,libdeflater=${crates_dir}/liblibdeflater.rlib]
+use deflater=true
+
+feat=[]
 
 target test {
 	dependency{target(compile test)}
@@ -20,11 +23,18 @@ target compile test:src {
    }
 
    display(Compiling test ...)
+   if {
+		eq(use deflater,true)
+		then {
+			array(--cfg, feature="deflate")
+			assign(feat,~~)
+		}
+	}
    exec rustc::  (
        --color, always,
        -L,all=${crates_dir},
        --extern, simzip,
-       --cfg, feature="deflate",
+       feat,
        -o,
        test,
        test.rs
@@ -40,9 +50,19 @@ target compile test:src {
 
 target simple_zip:src {
     dependency{
-    	anynewer(${~cwd~}/*.rs,${crates_dir}/lib${crate}.rlib)
+        or{
+        	anynewer(${~cwd~}/*.rs,${crates_dir}/lib${crate}.rlib)
+        	anynewer(../bee.7b,${crates_dir}/lib${crate}.rlib)
+        }
     }
 	display(Building crate ${crate} in ${crates_dir}/lib${crate}.rlib)
+	if {
+		eq(use deflater,true)
+		then {
+			array(--cfg, feature="deflate")
+			assign(feat,~~)
+		}
+	}
 	exec rustc::  (
 	  --color, always,
 	 -C, opt-level=2,
@@ -52,7 +72,7 @@ target simple_zip:src {
 	 dep_crates,
 	 --crate-name, crate,
      --out-dir, crates_dir,
-     --cfg, feature="deflate",
+     feat,
      lib.rs
    )
    if {
