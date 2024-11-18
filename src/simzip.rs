@@ -149,7 +149,7 @@ impl ZipEntry {
                     Compression::Store => {
                         len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
                         assert_eq!(len, mem.len());
-                        self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
+                        self.crc = crc32::update_fast_16(0/*u32::MAX*/, &mem).into()
                     }
                     #[cfg(feature = "deflate")]
                     Compression::Deflate => {
