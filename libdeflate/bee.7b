@@ -60,6 +60,7 @@ target dep_crate_comp:libdeflate-sys/src {
 	 --crate-type=lib,
 	 --edition, 2021,
      -L, ../../../libdeflate/build,
+     -l, static=deflate,
 	 --crate-name, dep crate,
      --out-dir, ../../${crates_dir},
      lib.rs
