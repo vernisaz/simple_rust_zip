@@ -38,7 +38,10 @@ The crate has one dependency. It gets built as a part of a building of the RustB
 specified in [bee.7b](https://github.com/vernisaz/simple_rust_zip/blob/ce7bf7385eef7d8bd84690b7fefe82f2a0275d9f/bee.7b#L2).
 
 **rb** will create the **simzip** crate.
+
+if you plan to *deflat* zip entires, then set the build script variable "use deflater" to **true** (default value). 
+Use *deflater" [bee.7b](./libdeflate/bee.7b) to buiild the required crate. Read instructions inside the bee.7b how to build.
+
 ## Future
 
-Some compressed format as deflat is considering. May take a look at 
-[libdeflate](https://github.com/ebiggers/libdeflate)?
+Some compressed more compressing format can be added in the future.
