@@ -10,6 +10,11 @@ dep crate=libdeflate_sys
 crates_dir=../../projects/rust_util/src/rust/crates
 dep_crates=[--extern,libdeflate_sys]
 
+target clean:: {
+     dependency{}
+     rm(./${crates_dir}/liblibdeflate_sys.rlib,./${crates_dir}/liblibdeflater.rlib)
+}
+
 target test {
 	dependency{target(compile test)}
 	dependency{}
@@ -55,7 +60,6 @@ target dep_crate_comp:libdeflate-sys/src {
 	 --crate-type=lib,
 	 --edition, 2021,
      -L, ../../../libdeflate/build,
-     -l, static=deflate,
 	 --crate-name, dep crate,
      --out-dir, ../../${crates_dir},
      lib.rs
@@ -80,7 +84,6 @@ target crate_compile:src {
 	 -L, ../${crates_dir},
 	 --crate-type=lib,
 	 --edition, 2021,
-         
 	 dep_crates,
 	 --crate-name, crate,
      --out-dir, ../${crates_dir},
