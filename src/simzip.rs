@@ -318,7 +318,7 @@ impl ZipEntry {
         let (y,m,d,h,min,s,_) = match &self.data { 
             Location::Mem(_) => {
                 let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
-                self.modified = current.as_millis() as u64;
+                self.modified = current.as_millis() as _;
                 time::get_datetime(1970, current.as_secs())
             }
             Location::Disk(ref path) => {
@@ -350,7 +350,7 @@ impl ZipEntry {
         res += len;
         // preserve the position to update size after finishing data
         let size_orig = match &self.data { 
-            Location::Mem(mem) => mem.len() as u64,
+            Location::Mem(mem) => mem.len() as _,
             Location::Disk(ref path) => fs::metadata(&*path).map_err(|e| format!{"no metadata for {path} -  {e}"})?.
                   len()
         };
