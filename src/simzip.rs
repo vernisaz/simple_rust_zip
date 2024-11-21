@@ -330,10 +330,10 @@ impl ZipEntry {
                 if metadata.permissions().mode() & 0o111 != 0 {
                     self.attributes.insert(Attribute::Exec);
                 }
-                self.modified =  metadata.
-                  modified().map_err(|e| format!{"no modified {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-               time::get_datetime(1970, metadata.
-                  created().map_err(|e| format!{"no modified {e}"})?.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs())
+                let timestamp = metadata.
+                  modified().map_err(|e| format!{"no modified {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap();
+                self.modified =  timestamp.as_millis() as _;
+                time::get_datetime(1970, timestamp.as_secs()) // use created() for extended timestamp storage
             }
         };
         let time: u16 = (s/2 + (min << 4) + (h << 11)).try_into().unwrap();
