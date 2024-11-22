@@ -239,6 +239,7 @@ impl ZipEntry {
         assert_eq!(len, 2);
         res += len;
         let extra_len = 0_u16; // no extra len, maybe add Info-ZIP UNIX (newer UID/GID) in future
+        // https://libzip.org/specifications/extrafld.txt
         len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
         res += len;
