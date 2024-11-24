@@ -326,18 +326,26 @@ impl ZipEntry {
 //                assert!{extra_len >= 0}
             }
             if extra_len > 0 && self.created > 0 {
+                // this header appeared if 5455 (UT) present in the file header
                 len = zip_file.write(&0x5455_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
                 assert_eq!(len, 2);
                 res += len;
-                len = zip_file.write(&9_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                extra_len -= len as u16;
+                len = zip_file.write(&5_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
                 assert_eq!(len, 2);
                 res += len;
-                len = zip_file.write(&0_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                extra_len -= len as u16;
+                len = zip_file.write(&7_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // atime, ctime & mtime
                 assert_eq!(len, 1);
                 res += len;
-                len = zip_file.write(&self.modified.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
-                assert_eq!(len, 8);
+                extra_len -= len as u16;
+                len = zip_file.write(&((self.modified / 1000) as u32).to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                assert_eq!(len, 4);
                 res += len;
+                extra_len -= len as u16;
+            }
+            if extra_len > 0 {
+                return Err(format!{"not corrent extra headers let calcumations, {extra_len} extra"})
             }
         }
         // comment
