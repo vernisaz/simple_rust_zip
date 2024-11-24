@@ -141,6 +141,9 @@ impl ZipEntry {
         len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
+        #[cfg(any(unix, target_os = "redox"))]
+        let extra_len = (2 + 2 + 1 + 3*4) as u16;
+        #[cfg(target_os = "windows")] 
         let extra_len = 0_u16;
         len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
@@ -148,6 +151,39 @@ impl ZipEntry {
         len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
         assert_eq!(len, name_bytes.len());
         res += len;
+        // write extra headers here
+        #[cfg(any(unix, target_os = "redox"))]
+        {
+            // TODO improve by reading metadata only once
+            let (atime,ctime,mtime) = match &self.data { 
+                Location::Mem(_) => {
+                    let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+                    (current, current, current)
+                }
+                Location::Disk(path) => {
+                    let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;
+                    (metadata.atime() as _,metadata.ctime() as _,metadata.mtime() as _)
+                }
+            };
+            len = zip_file.write(&(0x5455_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+            assert_eq!(len, 2);
+            res += len;
+            len = zip_file.write(&(((1+3*4) as u16) .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+            assert_eq!(len, 2);
+            res += len;
+            len = zip_file.write(&(7_u8 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+            assert_eq!(len, 1);
+            res += len;
+            len = zip_file.write(&(mtime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+            assert_eq!(len, 4);
+            res += len;
+            len = zip_file.write(&(atime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+            assert_eq!(len, 4);
+            res += len;
+            len = zip_file.write(&(ctime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+            assert_eq!(len, 4);
+            res += len;
+        }
         
         // writing content 
         match &self.data {
@@ -250,6 +286,10 @@ impl ZipEntry {
         if  self.gid != 0 || self.uid != 0 {
             extra_len += 4 + 1 + 1 + 2 + 1 + 2
         }
+        #[cfg(any(unix, target_os = "redox"))]
+        if  self.modified != 0 || self.created != 0{
+            extra_len += 9
+        }
         // https://libzip.org/specifications/extrafld.txt
         len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
@@ -325,7 +365,7 @@ impl ZipEntry {
                 
 //                assert!{extra_len >= 0}
             }
-            if extra_len > 0 && self.created > 0 {
+            if extra_len > 0 && (self.modified > 0 || self.created > 0) {
                 // this header appeared if 5455 (UT) present in the file header
                 len = zip_file.write(&0x5455_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
                 assert_eq!(len, 2);
