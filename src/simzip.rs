@@ -12,7 +12,7 @@ use std::hash::{Hash, Hasher};
 use std::cell::Cell;
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{PermissionsExt,MetadataExt};
 use crate::crc32;
 use crate::simzip::Location::Disk;
 
@@ -71,6 +71,13 @@ pub struct ZipEntry {
     crc: Cell<u32>, // crc32
     offset: u32, // a header offset in zip
     modified: u64,
+    #[cfg(any(unix, target_os = "redox"))]
+    uid: u32,
+    #[cfg(any(unix, target_os = "redox"))]
+    gid: u32,
+    #[cfg(any(unix, target_os = "redox"))]
+    created: u64,
+    // #[cfg(target_os = "windows")]
 }
 
 #[derive(Default)]
@@ -238,7 +245,11 @@ impl ZipEntry {
         len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
-        let extra_len = 0_u16; // no extra len, maybe add Info-ZIP UNIX (newer UID/GID) in future
+        let mut extra_len = 0_u16; // no extra len, maybe add Info-ZIP UNIX (newer UID/GID) in future
+        #[cfg(any(unix, target_os = "redox"))]
+        if  self.gid != 0 || self.uid != 0 {
+            extra_len += 4 + 1 + 1 + 2 + 1 + 2
+        }
         // https://libzip.org/specifications/extrafld.txt
         len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
         assert_eq!(len, 2);
@@ -281,7 +292,40 @@ impl ZipEntry {
         res += len;
         //  write extra here
         if extra_len > 0 {
-            if self.modified > 0 {
+            #[cfg(any(unix, target_os = "redox"))]
+            if  self.gid != 0 || self.uid != 0 {
+                len = zip_file.write(&0x7875_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // uid/gid
+                assert_eq!(len, 2);
+                res += len;
+                extra_len -= len as u16;
+                len = zip_file.write(&((1 + 1 + 2 + 1 + 2) as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                assert_eq!(len, 2);
+                res += len;
+                extra_len -= len as u16;
+                len = zip_file.write(&1_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // ver
+                assert_eq!(len, 1);
+                res += len;
+                extra_len -= len as u16;
+                len = zip_file.write(&2_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // size
+                assert_eq!(len, 1);
+                res += len;
+                extra_len -= len as u16;
+                len = zip_file.write(&(self.uid as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?; // uid
+                assert_eq!(len, 2);
+                res += len;
+                extra_len -= len as u16;
+                len = zip_file.write(&2_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // size
+                assert_eq!(len, 1);
+                res += len;
+                extra_len -= len as u16;
+                len = zip_file.write(&(self.gid as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?; // gid
+                assert_eq!(len, 2);
+                res += len;
+                extra_len -= len as u16;
+                
+//                assert!{extra_len >= 0}
+            }
+            if extra_len > 0 && self.created > 0 {
                 len = zip_file.write(&0x5455_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
                 assert_eq!(len, 2);
                 res += len;
@@ -294,15 +338,6 @@ impl ZipEntry {
                 len = zip_file.write(&self.modified.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
                 assert_eq!(len, 8);
                 res += len;
-            }
-            if self.attributes.len() > 0 {
-                len = zip_file.write(&0x7875_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
-                assert_eq!(len, 2);
-                res += len;
-                len = zip_file.write(&0xb_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
-                assert_eq!(len, 2);
-                res += len;
-                
             }
         }
         // comment
@@ -331,10 +366,14 @@ impl ZipEntry {
                 if metadata.permissions().mode() & 0o111 != 0 {
                     self.attributes.insert(Attribute::Exec);
                 }
+                self.uid = metadata.uid();
+                self.gid = metadata.gid();
+                self.created = metadata.
+                  created().map_err(|e| format!{"no modified {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as _;
                 let timestamp = metadata.
                   modified().map_err(|e| format!{"no modified {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap();
                 self.modified =  timestamp.as_millis() as _;
-                time::get_datetime(1970, timestamp.as_secs()) // use created() for extended timestamp storage
+                time::get_datetime(1970, timestamp.as_secs()) // or modified / 1000
             }
         };
         let time: u16 = (s/2 + (min << 4) + (h << 11)).try_into().unwrap();
