@@ -70,7 +70,7 @@ pub struct ZipEntry {
     len: u32, // compressed
     crc: Cell<u32>, // crc32
     offset: u32, // the header offset in a zip
-    modified: u64,
+    modified: u64, // in secs since epoch
     #[cfg(any(unix, target_os = "redox"))]
     uid: u32,
     #[cfg(any(unix, target_os = "redox"))]
@@ -149,8 +149,8 @@ impl ZipEntry {
          // TODO improve by reading metadata only once
         let (atime,ctime,mtime) = match &self.data { 
             Location::Mem(_) => {
-                let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
-                (0, current, 0)
+                self.created = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+                (0, self.created, 0)
             }
             Location::Disk(path) => {
                 let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;
@@ -404,7 +404,7 @@ impl ZipEntry {
                 assert_eq!(len, 1);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&((self.modified / 1000) as u32).to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                len = zip_file.write(&((if self.modified > 0 {self.modified} else {self.created}) as u32).to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
                 assert_eq!(len, 4);
                 res += len;
                 extra_len -= len as u16;
@@ -442,11 +442,11 @@ impl ZipEntry {
                 self.uid = metadata.uid();
                 self.gid = metadata.gid();
                 self.created = metadata.
-                  created().map_err(|e| format!{"no modified {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as _;
+                  created().map_err(|e| format!{"no created {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as _;
                 let timestamp = metadata.
                   modified().map_err(|e| format!{"no modified {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap();
-                self.modified =  timestamp.as_millis() as _;
-                time::get_datetime(1970, timestamp.as_secs()) // or modified / 1000
+                self.modified =  timestamp.as_secs();
+                time::get_datetime(1970, self.modified)
             }
         };
         let time: u16 = (s/2 + (min << 4) + (h << 11)).try_into().unwrap();
