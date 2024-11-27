@@ -432,8 +432,8 @@ impl ZipEntry {
         let (y,m,d,h,min,s,_) = match &self.data { 
             Location::Mem(_) => {
                 let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
-                self.modified = current.as_millis() as _;
-                time::get_datetime(1970, current.as_secs())
+                self.modified = current.as_secs() as _;
+                time::get_datetime(1970, self.modified)
             }
             Location::Disk(ref path) => {
                 let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;

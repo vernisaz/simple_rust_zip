@@ -2,6 +2,7 @@ crate=simzip
 crates_dir=../../rust_util/src/rust/crates
 dep_crates=[--extern,time=${crates_dir}/libtime.rlib] #,--extern,libdeflater=${crates_dir}/liblibdeflater.rlib]
 use deflater=true
+unix test=!true
 
 feat=[]
 
@@ -24,13 +25,15 @@ target compile test:src {
 
    display(Compiling test ...)
    if {
-		eq(use deflater,true)
+		eq(unix test,true)
 		then {
-			array(--cfg, feature="deflate")
-			assign(feat,~~)
+			array(--cfg, feature="test_unix")
+		} else {
+			array()
 		}
 	}
-   exec rustc::  (
+	assign(feat,~~)
+    exec rustc::  (
        --color, always,
        -L,all=${crates_dir},
        --extern, simzip,
