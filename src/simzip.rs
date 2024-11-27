@@ -69,7 +69,7 @@ pub struct ZipEntry {
     data: Location, // includes len uncompressed (original)
     len: u32, // compressed
     crc: Cell<u32>, // crc32
-    offset: u32, // a header offset in zip
+    offset: u32, // the header offset in a zip
     modified: u64,
     #[cfg(any(unix, target_os = "redox"))]
     uid: u32,
@@ -142,7 +142,38 @@ impl ZipEntry {
         assert_eq!(len, 2);
         res += len;
         #[cfg(any(unix, target_os = "redox"))]
-        let extra_len = (2 + 2 + 1 + 3*4) as u16;
+        let mut time_headers = 0;
+        #[cfg(any(unix, target_os = "redox"))]
+        let mut mask = 0_u8;
+        #[cfg(any(unix, target_os = "redox"))]
+         // TODO improve by reading metadata only once
+        let (atime,ctime,mtime) = match &self.data { 
+            Location::Mem(_) => {
+                let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+                (0, current, 0)
+            }
+            Location::Disk(path) => {
+                let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;
+                (metadata.atime() as _,metadata.ctime() as _,metadata.mtime() as _)
+            }
+        };
+        #[cfg(any(unix, target_os = "redox"))]
+        {
+            if mtime >  0 {
+                time_headers += 1;
+                mask |= 0b0000_0001
+            }
+            if atime >  0 {
+                time_headers += 1;
+                mask |= 0b0000_0010
+            }
+            if ctime >  0 {
+                time_headers += 1;
+                mask |= 0b0000_0100
+            }
+        }
+        #[cfg(any(unix, target_os = "redox"))]
+        let extra_len = (2 + 2 + 1 + time_headers*4) as u16;
         #[cfg(target_os = "windows")] 
         let extra_len = 0_u16;
         len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
@@ -154,35 +185,31 @@ impl ZipEntry {
         // write extra headers here
         #[cfg(any(unix, target_os = "redox"))]
         {
-            // TODO improve by reading metadata only once
-            let (atime,ctime,mtime) = match &self.data { 
-                Location::Mem(_) => {
-                    let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
-                    (current, current, current)
-                }
-                Location::Disk(path) => {
-                    let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;
-                    (metadata.atime() as _,metadata.ctime() as _,metadata.mtime() as _)
-                }
-            };
             len = zip_file.write(&(0x5455_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
             assert_eq!(len, 2);
             res += len;
-            len = zip_file.write(&(((1+3*4) as u16) .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+
+            len = zip_file.write(&(((1+time_headers*4) as u16) .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
             assert_eq!(len, 2);
             res += len;
-            len = zip_file.write(&(7_u8 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+            len = zip_file.write(&(mask .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
             assert_eq!(len, 1);
             res += len;
-            len = zip_file.write(&(mtime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
-            assert_eq!(len, 4);
-            res += len;
-            len = zip_file.write(&(atime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
-            assert_eq!(len, 4);
-            res += len;
-            len = zip_file.write(&(ctime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
-            assert_eq!(len, 4);
-            res += len;
+            if mtime > 0 {
+                len = zip_file.write(&(mtime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+                assert_eq!(len, 4);
+                res += len;
+            }
+            if atime > 0 {
+                len = zip_file.write(&(atime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+                assert_eq!(len, 4);
+                res += len;
+            }
+            if ctime > 0 {
+                len = zip_file.write(&(ctime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+                assert_eq!(len, 4);
+                res += len;
+            }
         }
         
         // writing content 
@@ -283,11 +310,11 @@ impl ZipEntry {
         res += len;
         let mut extra_len = 0_u16; // no extra len, maybe add Info-ZIP UNIX (newer UID/GID) in future
         #[cfg(any(unix, target_os = "redox"))]
-        if  self.gid != 0 || self.uid != 0 {
+        if  self.gid != 0 || self.uid != 0 { // ("ux")
             extra_len += 4 + 1 + 1 + 2 + 1 + 2
         }
         #[cfg(any(unix, target_os = "redox"))]
-        if  self.modified != 0 || self.created != 0{
+        if  self.modified != 0 || self.created != 0 { // ("UT")
             extra_len += 9
         }
         // https://libzip.org/specifications/extrafld.txt
@@ -330,10 +357,10 @@ impl ZipEntry {
         len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
         assert_eq!(len, name_bytes.len());
         res += len;
-        //  write extra here
+        //  write extra headers here
         if extra_len > 0 {
             #[cfg(any(unix, target_os = "redox"))]
-            if  self.gid != 0 || self.uid != 0 {
+            if  self.gid != 0 || self.uid != 0 { // ("ux")
                 len = zip_file.write(&0x7875_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // uid/gid
                 assert_eq!(len, 2);
                 res += len;
@@ -362,10 +389,8 @@ impl ZipEntry {
                 assert_eq!(len, 2);
                 res += len;
                 extra_len -= len as u16;
-                
-//                assert!{extra_len >= 0}
             }
-            if extra_len > 0 && (self.modified > 0 || self.created > 0) {
+            if extra_len > 0 && (self.modified > 0 || self.created > 0) { // ("UT")
                 // this header appeared if 5455 (UT) present in the file header
                 len = zip_file.write(&0x5455_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
                 assert_eq!(len, 2);
