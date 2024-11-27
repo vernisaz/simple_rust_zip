@@ -77,6 +77,8 @@ pub struct ZipEntry {
     gid: u32,
     #[cfg(any(unix, target_os = "redox"))]
     created: u64,
+    #[cfg(any(unix, target_os = "redox"))]
+    times_mask: Cell<u8>, // times field mask
     // #[cfg(target_os = "windows")]
 }
 
@@ -172,6 +174,8 @@ impl ZipEntry {
                 mask |= 0b0000_0100
             }
         }
+        #[cfg(any(unix, target_os = "redox"))]
+        self.times_mask.set(mask);
         #[cfg(any(unix, target_os = "redox"))]
         let extra_len = (2 + 2 + 1 + time_headers*4) as u16;
         #[cfg(target_os = "windows")] 
@@ -400,7 +404,8 @@ impl ZipEntry {
                 assert_eq!(len, 2);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&7_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // atime, ctime & mtime
+                // the below mask has to be in sync with the local header mask
+                len = zip_file.write(&self.times_mask.get().to_ne_bytes()).map_err(|e| format!("{e}"))?; // atime, ctime & mtime
                 assert_eq!(len, 1);
                 res += len;
                 extra_len -= len as u16;
