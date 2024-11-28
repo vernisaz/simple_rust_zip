@@ -361,7 +361,7 @@ impl ZipEntry {
         len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
         assert_eq!(len, name_bytes.len());
         res += len;
-        //  write extra headers here
+        //  writing extra headers
         if extra_len > 0 {
             #[cfg(any(unix, target_os = "redox"))]
             if  self.gid != 0 || self.uid != 0 { // ("ux")
@@ -415,7 +415,7 @@ impl ZipEntry {
                 extra_len -= len as u16;
             }
             if extra_len > 0 {
-                return Err(format!{"not corrent extra headers let calcumations, {extra_len} extra"})
+                return Err(format!{"not correct extra headers len calculation, {extra_len} extra"})
             }
         }
         // comment
