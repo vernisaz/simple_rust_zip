@@ -30,6 +30,18 @@ match zip.store() {
 ```
 The underline code will automatically add correct file permissions on UNIX systems.
 
+There is nothing to prevent you to continue adding a content after storing, and
+then to store again. But remember that repeating storing will overwrite a
+previosly stored zip unless you change its name. A repeating store can be
+useful in a case of an error like an insufficient disk space hoping that after some time
+more space will be available.
+
+## Limitations
+
+A created zip file can't exceed 2GB. A zip entry can't exceed available RAM size.
+Streaming can't be used, because same zip content gets updated after an initial
+writing.
+
 ## Building the crate
 
 Obtain the RustBee first. It's an alternative tool to Cargo. You may need to build it for your platform. 
