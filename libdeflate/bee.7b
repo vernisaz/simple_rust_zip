@@ -8,7 +8,11 @@
 crate=libdeflater 
 dep crate=libdeflate_sys
 crates_dir=../../projects/rust_util/src/rust/crates
+lib_deflate_dir=../libdeflate
 dep_crates=[--extern,libdeflate_sys]
+
+canonicalize(lib_deflate_dir)
+assign(lib_deflate_dir_can,~~)
 
 target clean:: {
      dependency{}
@@ -48,6 +52,27 @@ target compile test:examples {
      }
 }
 
+target deflate : lib_deflate_dir {
+    dependency {
+       or {
+       	   not(timestamp(build/libdeflate.a))
+       }
+    }
+	exec cmake (cmake -B build)
+	if {
+         neq(~~, 0)
+         then {
+            panic("cmake error(s)")
+         }
+     }
+	exec cmake (cmake --build build)
+	if {
+         neq(~~, 0)
+         then {
+            panic("cmake error(s)")
+         }
+     }
+}
 
 target dep_crate_comp:libdeflate-sys/src {
     dependency{
@@ -59,7 +84,7 @@ target dep_crate_comp:libdeflate-sys/src {
 	 -C, opt-level=0,
 	 --crate-type=lib,
 	 --edition, 2021,
-     -L, ../../../libdeflate/build,
+     -L, ../../${lib_deflate_dir}/build,
      -l, static=deflate,
 	 --crate-name, dep crate,
      --out-dir, ../../${crates_dir},
