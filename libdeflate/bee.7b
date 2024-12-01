@@ -5,6 +5,7 @@
 # copy bee.7b to the libdeflater root directory
 # edit it to specify the common crate location as the crates_dir
 # build - rb
+# TODO incorprate it in the main script by include()
 crate=libdeflater 
 dep crate=libdeflate_sys
 crates_dir=../../projects/rust_util/src/rust/crates
@@ -54,8 +55,8 @@ target compile test:examples {
 
 target deflate : lib_deflate_dir {
     dependency {
-       or {
-       	   not(timestamp(build/libdeflate.a))
+       eq {
+       	   timestamp(build/libdeflate.a)
        }
     }
 	exec cmake (cmake -B build)
@@ -78,6 +79,7 @@ target dep_crate_comp:libdeflate-sys/src {
     dependency{
     	anynewer(${~cwd~}/*.rs,../../${crates_dir}/lib${dep crate}.rlib)
     }
+    dependency{target(deflate)}
 	display(Building crate ${dep crate} in ${crates_dir}/lib${crate}.rlib)
 	exec rustc::  (
 	  --color, always,
