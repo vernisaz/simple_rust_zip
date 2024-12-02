@@ -1,5 +1,5 @@
 crate=simzip
-crates_dir=../../rusthub/src/rust/crates
+crates_dir=../../rust_util/src/rust/crates
 dep_crates=[--extern,time=${crates_dir}/libtime.rlib] #,--extern,libdeflater=${crates_dir}/liblibdeflater.rlib]
 use deflater=true
 unix test=!true
