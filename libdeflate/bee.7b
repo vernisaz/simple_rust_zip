@@ -32,13 +32,13 @@ assign(crate_compile dir,${deflater_dir_can}${~/~}src)
 
 target clean:: {
      dependency{}
-     rm(./${crates_dir}/liblibdeflate_sys.rlib,./${crates_dir}/liblibdeflater.rlib)
+     rm(${crates_dir_can}${~/~}liblibdeflate_sys.rlib,${crates_dir_can}${~/~}liblibdeflater.rlib)
 }
 
-target test {
+target test:compile test dir {
 	dependency{target(compile test)}
 	dependency{}
-	exec examples/test (~args~)
+	exec test (~args~)
 }
 
 target compile test:compile test dir {
