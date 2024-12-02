@@ -1,19 +1,34 @@
 # 7bee (RustBee) script for building the deflate dependency
-# check out libdeflate https://github.com/ebiggers/libdeflate
-# run : cmake -B build && cmake --build build
-# check out libdeflater https://github.com/adamkewley/libdeflater
-# copy bee.7b to the libdeflater root directory
-# edit it to specify the common crate location as the crates_dir
+# RB version 1.13 or better is required
+# git clone out libdeflate https://github.com/ebiggers/libdeflate
+#
+# git clone out libdeflater https://github.com/adamkewley/libdeflater
+# edit bee.7b in this directory specifying a location just cloned repositoies and
+#  the common crate location as the crates_dir
 # build - rb
 # TODO incorprate it in the main script by include()
+
+lib_deflate_dir=../../../side/libdeflate
+deflater_dir=../../../side/libdeflater
+crates_dir=../../rust_util/src/rust/crates
+
 crate=libdeflater 
 dep crate=libdeflate_sys
-crates_dir=../../projects/rust_util/src/rust/crates
-lib_deflate_dir=../libdeflate
+
 dep_crates=[--extern,libdeflate_sys]
 
 canonicalize(lib_deflate_dir)
 assign(lib_deflate_dir_can,~~)
+
+canonicalize(crates_dir)
+assign(crates_dir_can,~~)
+
+canonicalize(deflater_dir)
+assign(deflater_dir_can,~~)
+
+assign(compile test dir,${deflater_dir_can}${~/~}examples)
+assign(dep_crate_comp dir,${deflater_dir_can}${~/~}libdeflate-sys/src)
+assign(crate_compile dir,${deflater_dir_can}${~/~}src)
 
 target clean:: {
      dependency{}
@@ -26,20 +41,20 @@ target test {
 	exec examples/test (~args~)
 }
 
-target compile test:examples {
+target compile test:compile test dir {
    dependency{ target(crate_compile)}
    dependency {
        or {
        anynewer(../bee.7b,test)
        anynewer(${~cwd~}/gz_compress.rs,${~cwd~}/test)
-       anynewer(../${crates_dir}/lib${crate}.rlib,${~cwd~}/test)
+       anynewer(${crates_dir_can}/lib${crate}.rlib,${~cwd~}/test)
        }
    }
 
    display(Compiling test ...)
    exec rustc::  (
        --color, always,
-       -L,all=../${crates_dir},
+       -L,all=crates_dir_can,
        --extern, crate,
        -o,
        test,
@@ -53,12 +68,13 @@ target compile test:examples {
      }
 }
 
-target deflate : lib_deflate_dir {
+target deflate : lib_deflate_dir_can {
     dependency {
        eq {
        	   timestamp(build/libdeflate.a)
        }
     }
+    display(${~cwd~} <= ${lib_deflate_dir_can})
 	exec cmake (cmake -B build)
 	if {
          neq(~~, 0)
@@ -73,11 +89,12 @@ target deflate : lib_deflate_dir {
             panic("cmake error(s)")
          }
      }
+     display(lib built)
 }
 
-target dep_crate_comp:libdeflate-sys/src {
+target dep_crate_comp:dep_crate_comp dir {
     dependency{
-    	anynewer(${~cwd~}/*.rs,../../${crates_dir}/lib${dep crate}.rlib)
+    	anynewer(${~cwd~}/*.rs,${crates_dir_can}/lib${dep crate}.rlib)
     }
     dependency{target(deflate)}
 	display(Building crate ${dep crate} in ${crates_dir}/lib${crate}.rlib)
@@ -86,10 +103,10 @@ target dep_crate_comp:libdeflate-sys/src {
 	 -C, opt-level=0,
 	 --crate-type=lib,
 	 --edition, 2021,
-     -L, ../../${lib_deflate_dir}/build,
+     -L, ${lib_deflate_dir_can}/build,
      -l, static=deflate,
 	 --crate-name, dep crate,
-     --out-dir, ../../${crates_dir},
+     --out-dir, crates_dir_can,
      lib.rs
    )
    if {
@@ -100,21 +117,29 @@ target dep_crate_comp:libdeflate-sys/src {
    }
 }
 
-target crate_compile:src {
+target dev : {
+	dependency{crate_compile}
+	
+	display(crates dir: ${crates_dir_can})
+	display(deflate dir: ${lib_deflate_dir_can})
+	display(deflater dir: ${deflater_dir_can})
+}
+
+target crate_compile:crate_compile dir {
     dependency { target(dep_crate_comp)}
     dependency{
-    	anynewer(${~cwd~}/*.rs,../${crates_dir}/lib${crate}.rlib)
+    	anynewer(${~cwd~}/*.rs,${crates_dir_can}/lib${crate}.rlib)
     }
 	display(Building crate ${crate} in ${crates_dir}/lib${crate}.rlib)
 	exec rustc::  (
 	  --color, always,
 	 -C, opt-level=0,
-	 -L, ../${crates_dir},
+	 -L, crates_dir_can,
 	 --crate-type=lib,
 	 --edition, 2021,
 	 dep_crates,
 	 --crate-name, crate,
-     --out-dir, ../${crates_dir},
+     --out-dir, crates_dir_can,
      lib.rs
    )
    if {
