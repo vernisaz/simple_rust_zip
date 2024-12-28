@@ -394,6 +394,7 @@ impl ZipEntry {
                 res += len;
                 extra_len -= len as u16;
             }
+            #[cfg(any(unix, target_os = "redox"))]
             if extra_len > 0 && (self.modified > 0 || self.created > 0) { // ("UT")
                 // this header appeared if 5455 (UT) present in the file header
                 len = zip_file.write(&0x5455_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
@@ -433,7 +434,7 @@ impl ZipEntry {
             Location::Mem(_) => {
                 let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
                 self.modified = current.as_secs() as _;
-                time::get_datetime(1970, self.modified)
+                simtime::get_datetime(1970, self.modified)
             }
             Location::Disk(ref path) => {
                 let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;
@@ -444,14 +445,17 @@ impl ZipEntry {
                 if metadata.permissions().mode() & 0o111 != 0 {
                     self.attributes.insert(Attribute::Exec);
                 }
+                #[cfg(unix)]
+                {
                 self.uid = metadata.uid();
                 self.gid = metadata.gid();
                 self.created = metadata.
                   created().map_err(|e| format!{"no created {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as _;
+                }
                 let timestamp = metadata.
                   modified().map_err(|e| format!{"no modified {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap();
                 self.modified =  timestamp.as_secs();
-                time::get_datetime(1970, self.modified)
+                simtime::get_datetime(1970, self.modified)
             }
         };
         let time: u16 = (s/2 + (min << 4) + (h << 11)).try_into().unwrap();
