@@ -312,7 +312,10 @@ impl ZipEntry {
         len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
         assert_eq!(len, 2);
         res += len;
-        let mut extra_len = 0_u16; // no extra len, maybe add Info-ZIP UNIX (newer UID/GID) in future
+        #[cfg(target_os = "windows")]
+        let extra_len = 0_u16; // no extra len
+        #[cfg(any(unix, target_os = "redox"))]
+        let mut extra_len = 0_u16; 
         #[cfg(any(unix, target_os = "redox"))]
         if  self.gid != 0 || self.uid != 0 { // ("ux")
             extra_len += 4 + 1 + 1 + 2 + 1 + 2

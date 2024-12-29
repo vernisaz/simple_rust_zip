@@ -1,10 +1,13 @@
 crate=simzip
-crates_dir=../../rust_util/src/rust/crates
-dep_crates=[--extern,time=${crates_dir}/libtime.rlib] #,--extern,libdeflater=${crates_dir}/liblibdeflater.rlib]
+crates_dir=..${~/~}crates
+dep_crates=[--extern,time=${crates_dir}${~/~}libtime.rlib] #,--extern,libdeflater=${crates_dir}/liblibdeflater.rlib]
 use deflater=true
 unix test=!true
 
 feat=[]
+
+absolute(crates_dir)
+assign(crates_dir,~~)
 
 target test {
 	dependency{target(compile test)}
@@ -17,9 +20,9 @@ target compile test:src {
    dependency{ target(simple_zip)}
    dependency {
        or {
-       anynewer(../bee.7b,test)
-       anynewer(${~cwd~}/test.rs,${~cwd~}/test)
-       anynewer(${crates_dir}/lib${crate}.rlib,${~cwd~}/test)
+       anynewer(..${~/~}bee.7b,test)
+       anynewer(${~cwd~}${~/~}test.rs,${~cwd~}${~/~}test)
+       anynewer(${crates_dir}${~/~}lib${crate}.rlib,${~cwd~}${~/~}test)
        }
    }
 
@@ -54,11 +57,11 @@ target compile test:src {
 target simple_zip:src {
     dependency{
         or{
-        	anynewer(${~cwd~}/*.rs,${crates_dir}/lib${crate}.rlib)
-        	anynewer(../bee.7b,${crates_dir}/lib${crate}.rlib)
+        	anynewer(${~cwd~}${~/~}*.rs,${crates_dir}${~/~}lib${crate}.rlib)
+        	anynewer(..${~/~}bee.7b,${crates_dir}${~/~}lib${crate}.rlib)
         }
     }
-	display(Building crate ${crate} in ${crates_dir}/lib${crate}.rlib)
+	display(Building crate ${crate} in ${crates_dir}${~/~}lib${crate}.rlib)
 	if {
 		eq(use deflater,true)
 		then {
