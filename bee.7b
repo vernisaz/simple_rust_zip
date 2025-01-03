@@ -53,6 +53,10 @@ target compile test:src {
      }
 }
 
+target clean {
+	dependency{true}
+	rm (${crates_dir}${~/~}lib${crate}.rlib)
+}
 
 target simple_zip:src {
     dependency{
