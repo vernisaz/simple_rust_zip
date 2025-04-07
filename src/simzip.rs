@@ -2,15 +2,15 @@
 extern crate libdeflater;
 #[cfg(feature = "deflate")]
 use libdeflater::{Compressor, CompressionLvl};
-use std::collections::HashSet;
+use std::{collections::HashSet,
+path::Path,
+fs::{self, File},
+io::{self, Write, Seek, Read, Error, ErrorKind},
+time::{SystemTime},
+hash::{Hash, Hasher},
+cell::Cell,
+};
 use crate::simzip::Location::Mem;
-use std::path::Path;
-use std::fs::{self, File};
-use std::io::{Write, Seek, Read};
-use std::time::{SystemTime};
-use std::hash::{Hash, Hasher};
-use std::cell::Cell;
-
 #[cfg(unix)]
 use std::os::unix::fs::{PermissionsExt,MetadataExt};
 use crate::crc32;
@@ -114,22 +114,22 @@ impl Compression {
 // info: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip-printable.html
 impl ZipEntry {
-    fn store(&mut self, mut zip_file: &File) -> Result<usize, String> {
+    fn store(&mut self, mut zip_file: &File) -> io::Result<usize> {
         let mut res = 0_usize;
         // TODO impl zip64
-        self.offset = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))? as u32;
-        let mut len = zip_file.write(&(0x504b0304_u32 .to_be_bytes())).map_err(|e| format!("{e}"))?;
+        self.offset = zip_file.seek(std::io::SeekFrom::Current(0))? as u32;
+        let mut len = zip_file.write(&(0x504b0304_u32 .to_be_bytes()))?;
         assert_eq!(len, 4);
         res += len;
-        len = zip_file.write(&VER_EXTRACT.to_ne_bytes()).map_err(|e| format!("{e}"))?; // version 2.0
+        len = zip_file.write(&VER_EXTRACT.to_ne_bytes())?; // version 2.0
         assert_eq!(len, 2);
         res += len;
         // flags
-        // set to 0x08 and then add data descriptor after data 3x4 bytes
-        len = zip_file.write(&0_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // flags
+        // set to 0x08 and then add a data descriptor after data 3x4 bytes
+        len = zip_file.write(&0_u16.to_ne_bytes())?; // flags
         assert_eq!(len, 2);
         res += len;
-        len = zip_file.write(&self.compression.value().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&self.compression.value().to_ne_bytes())?; 
         assert_eq!(len, 2);
         res += len;
         let (comm_len,crc_pos) = self.write_common(&zip_file)?;
@@ -140,7 +140,7 @@ impl ZipEntry {
             None => self.name.clone()
         };
         let name_bytes = combined_name.as_bytes();
-        len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes())?;
         assert_eq!(len, 2);
         res += len;
         #[cfg(any(unix, target_os = "redox"))]
@@ -155,7 +155,7 @@ impl ZipEntry {
                 (0, self.created, 0)
             }
             Location::Disk(path) => {
-                let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;
+                let metadata = fs::metadata(&*path)?;
                 (metadata.atime() as _,metadata.ctime() as _,metadata.mtime() as _)
             }
         };
@@ -180,37 +180,37 @@ impl ZipEntry {
         let extra_len = (2 + 2 + 1 + time_headers*4) as u16;
         #[cfg(target_os = "windows")] 
         let extra_len = 0_u16;
-        len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        len = zip_file.write(&extra_len.to_ne_bytes())?; // extra fields
         assert_eq!(len, 2);
         res += len;
-        len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&name_bytes)?;
         assert_eq!(len, name_bytes.len());
         res += len;
         // write extra headers here
         #[cfg(any(unix, target_os = "redox"))]
         {
-            len = zip_file.write(&(0x5455_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+            len = zip_file.write(&(0x5455_u16 .to_ne_bytes()))?; // OS
             assert_eq!(len, 2);
             res += len;
 
-            len = zip_file.write(&(((1+time_headers*4) as u16) .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+            len = zip_file.write(&(((1+time_headers*4) as u16) .to_ne_bytes()))?; // OS
             assert_eq!(len, 2);
             res += len;
-            len = zip_file.write(&(mask .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+            len = zip_file.write(&(mask .to_ne_bytes()))?; // OS
             assert_eq!(len, 1);
             res += len;
             if mtime > 0 {
-                len = zip_file.write(&(mtime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+                len = zip_file.write(&(mtime as u32) .to_ne_bytes())?; // OS
                 assert_eq!(len, 4);
                 res += len;
             }
             if atime > 0 {
-                len = zip_file.write(&(atime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+                len = zip_file.write(&(atime as u32) .to_ne_bytes())?; // OS
                 assert_eq!(len, 4);
                 res += len;
             }
             if ctime > 0 {
-                len = zip_file.write(&(ctime as u32) .to_ne_bytes()).map_err(|e| format!("{e}"))?; // OS
+                len = zip_file.write(&(ctime as u32) .to_ne_bytes())?; // OS
                 assert_eq!(len, 4);
                 res += len;
             }
@@ -221,7 +221,7 @@ impl ZipEntry {
             Location::Mem(mem) => {
                 match self.compression {
                     Compression::Store => {
-                        len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                        len = zip_file.write(&mem)?;
                         assert_eq!(len, mem.len());
                         self.crc = crc32::update_fast_16(0/*u32::MAX*/, &mem).into()
                     }
@@ -233,11 +233,11 @@ impl ZipEntry {
                         compressed_data.resize(max_sz, 0);
                         let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).unwrap();
                         compressed_data.resize(actual_sz, 0);
-                        len = zip_file.write(&compressed_data).map_err(|e| format!("{e}"))?;
+                        len = zip_file.write(&compressed_data)?;
                         assert_eq!(len, compressed_data.len()); 
                         self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
-                    _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
+                    _ => return Err(Error::new(ErrorKind::Other, format!{"compression {:?} isn't supported yet", self.compression}))
                 }
                 // compressed len
                 self.len = len as u32;
@@ -245,12 +245,12 @@ impl ZipEntry {
             }
             Location::Disk(path) => {
             // TODO consider a streaming way
-                let mut f = File::open(&**path).map_err(|e| format!("file: {path} - {e}"))?;
+                let mut f = File::open(&**path)?;
                 let mut mem = vec![];
-                f.read_to_end(&mut mem).map_err(|e| format!("file: {path} - {e}"))?;
+                f.read_to_end(&mut mem)?;
                 match self.compression {
                     Compression::Store => {
-                          len = zip_file.write(&mem).map_err(|e| format!("{e}"))?;
+                          len = zip_file.write(&mem)?;
                           assert_eq!(len, mem.len());
                           self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()  
                     }
@@ -262,44 +262,44 @@ impl ZipEntry {
                         compressed_data.resize(max_sz, 0);
                         let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).unwrap();
                         compressed_data.resize(actual_sz, 0);
-                        len = zip_file.write(&compressed_data).map_err(|e| format!("{e}"))?;
+                        len = zip_file.write(&compressed_data)?;
                         assert_eq!(len, compressed_data.len());
                         self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
-                    _ => return Err(format!{"compression {:?} isn't supported yet", self.compression})
+                    _ => return Err(Error::new(ErrorKind::Other, format!{"compression {:?} isn't supported yet", self.compression}))
                 }
                 self.len = len as u32;
                 res += len;
             }
         }
         // update crc , save current pos
-        let current_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
+        let current_pos = zip_file.seek(std::io::SeekFrom::Current(0))?;
         
-        zip_file.seek(std::io::SeekFrom::Start(crc_pos)).map_err(|e| format!("{e}"))?;
-        len = zip_file.write(&self.crc.get().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        zip_file.seek(std::io::SeekFrom::Start(crc_pos))?;
+        len = zip_file.write(&self.crc.get().to_ne_bytes())?; 
         assert_eq!(len, 4);
-        len = zip_file.write(&self.len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // compressed len
+        len = zip_file.write(&self.len.to_ne_bytes())?; // compressed len
         assert_eq!(len, 4);
         
-        zip_file.seek(std::io::SeekFrom::Start(current_pos)).map_err(|e| format!("{e}"))?;
+        zip_file.seek(std::io::SeekFrom::Start(current_pos))?;
         Ok(res)
     }
     
-    fn store_dir(&mut self, mut zip_file: &File) -> Result<u32, String> {
+    fn store_dir(&mut self, mut zip_file: &File) -> io::Result<u32> {
         let mut res = 0_usize;
-        let mut len = zip_file.write(&(0x02014b50_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        let mut len = zip_file.write(&(0x02014b50_u32 .to_ne_bytes()))?;
         assert_eq!(len, 4);
         res += len;
-        len = zip_file.write(&(0x033F_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?; // OS
+        len = zip_file.write(&(0x033F_u16 .to_ne_bytes()))?; // OS
         assert_eq!(len, 2);
         res += len;
-        len = zip_file.write(&VER_EXTRACT.to_ne_bytes()).map_err(|e| format!("{e}"))?; // version 2.0
+        len = zip_file.write(&VER_EXTRACT.to_ne_bytes())?; // version 2.0
         assert_eq!(len, 2);
         res += len;
-        len = zip_file.write(&0_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // 
+        len = zip_file.write(&0_u16.to_ne_bytes())?; // 
         assert_eq!(len, 2);
         res += len;
-        len = zip_file.write(&self.compression.value().to_ne_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&self.compression.value().to_ne_bytes())?; 
         assert_eq!(len, 2);
         res += len;
         res += self.write_common(zip_file)?.0;
@@ -309,7 +309,7 @@ impl ZipEntry {
             None => self.name.clone()
         };
         let name_bytes = combined_name.as_bytes();
-        len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&(name_bytes.len() as u16).to_ne_bytes())?;
         assert_eq!(len, 2);
         res += len;
         #[cfg(target_os = "windows")]
@@ -325,7 +325,7 @@ impl ZipEntry {
             extra_len += 9
         }
         // https://libzip.org/specifications/extrafld.txt
-        len = zip_file.write(&extra_len.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        len = zip_file.write(&extra_len.to_ne_bytes())?; // extra fields
         assert_eq!(len, 2);
         res += len;
         
@@ -334,15 +334,15 @@ impl ZipEntry {
             None => "".to_string()
         };
         let comment_bytes = comment.as_bytes();
-        len = zip_file.write(&(comment_bytes.len() as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        len = zip_file.write(&(comment_bytes.len() as u16).to_ne_bytes())?; // extra fields
         assert_eq!(len, 2);
         res += len;
         let disk_no = 0_u16;
-        len = zip_file.write(&disk_no.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        len = zip_file.write(&disk_no.to_ne_bytes())?; // extra fields
         assert_eq!(len, 2);
         res += len;
         let intern_attr = 0_u16;
-        len = zip_file.write(&intern_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        len = zip_file.write(&intern_attr.to_ne_bytes())?; // extra fields
         assert_eq!(len, 2);
         res += len;
         let mut ext_attr = 0x81000000_u32;
@@ -354,45 +354,45 @@ impl ZipEntry {
             perm |= 0o111;
         }
         ext_attr |= (perm as u32) << 16;
-        len = zip_file.write(&ext_attr.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        len = zip_file.write(&ext_attr.to_ne_bytes())?; // extra fields
         assert_eq!(len, 4);
         res += len;
         // no calculation based on multi disks
-        len = zip_file.write(&self.offset.to_ne_bytes()).map_err(|e| format!("{e}"))?; // extra fields
+        len = zip_file.write(&self.offset.to_ne_bytes())?; // extra fields
         assert_eq!(len, 4);
         res += len;
-        len = zip_file.write(&name_bytes).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&name_bytes)?;
         assert_eq!(len, name_bytes.len());
         res += len;
         //  writing extra headers
         if extra_len > 0 {
             #[cfg(any(unix, target_os = "redox"))]
             if  self.gid != 0 || self.uid != 0 { // ("ux")
-                len = zip_file.write(&0x7875_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // uid/gid
+                len = zip_file.write(&0x7875_u16.to_ne_bytes())?; // uid/gid
                 assert_eq!(len, 2);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&((1 + 1 + 2 + 1 + 2) as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                len = zip_file.write(&((1 + 1 + 2 + 1 + 2) as u16).to_ne_bytes())?; // len
                 assert_eq!(len, 2);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&1_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // ver
+                len = zip_file.write(&1_u8.to_ne_bytes())?; // ver
                 assert_eq!(len, 1);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&2_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // size
+                len = zip_file.write(&2_u8.to_ne_bytes())?; // size
                 assert_eq!(len, 1);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&(self.uid as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?; // uid
+                len = zip_file.write(&(self.uid as u16).to_ne_bytes())?; // uid
                 assert_eq!(len, 2);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&2_u8.to_ne_bytes()).map_err(|e| format!("{e}"))?; // size
+                len = zip_file.write(&2_u8.to_ne_bytes())?; // size
                 assert_eq!(len, 1);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&(self.gid as u16).to_ne_bytes()).map_err(|e| format!("{e}"))?; // gid
+                len = zip_file.write(&(self.gid as u16).to_ne_bytes())?; // gid
                 assert_eq!(len, 2);
                 res += len;
                 extra_len -= len as u16;
@@ -400,38 +400,38 @@ impl ZipEntry {
             #[cfg(any(unix, target_os = "redox"))]
             if extra_len > 0 && (self.modified > 0 || self.created > 0) { // ("UT")
                 // this header appeared if 5455 (UT) present in the file header
-                len = zip_file.write(&0x5455_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                len = zip_file.write(&0x5455_u16.to_ne_bytes())?; // len
                 assert_eq!(len, 2);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&5_u16.to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                len = zip_file.write(&5_u16.to_ne_bytes())?; // len
                 assert_eq!(len, 2);
                 res += len;
                 extra_len -= len as u16;
                 // the below mask has to be in sync with the local header mask
-                len = zip_file.write(&self.times_mask.get().to_ne_bytes()).map_err(|e| format!("{e}"))?; // atime, ctime & mtime
+                len = zip_file.write(&self.times_mask.get().to_ne_bytes())?; // atime, ctime & mtime
                 assert_eq!(len, 1);
                 res += len;
                 extra_len -= len as u16;
-                len = zip_file.write(&((if self.modified > 0 {self.modified} else {self.created}) as u32).to_ne_bytes()).map_err(|e| format!("{e}"))?; // len
+                len = zip_file.write(&((if self.modified > 0 {self.modified} else {self.created}) as u32).to_ne_bytes())?; // len
                 assert_eq!(len, 4);
                 res += len;
                 extra_len -= len as u16;
             }
             if extra_len > 0 {
-                return Err(format!{"not correct extra headers len calculation, {extra_len} extra"})
+                return Err(Error::new(ErrorKind::Other, format!{"not correct extra headers len calculation, {extra_len} extra"}))
             }
         }
         // comment
         if comment_bytes.len() > 0 {
-           len = zip_file.write(&comment_bytes).map_err(|e| format!("{e}"))?;
+           len = zip_file.write(&comment_bytes)?;
             assert_eq!(len, comment_bytes.len());
             res += len; 
         }
         Ok(res as u32)
     }
     
-    fn write_common(&mut self, mut zip_file: &File) -> Result<(usize, u64), String> {
+    fn write_common(&mut self, mut zip_file: &File) -> io::Result<(usize, u64)> {
         let mut res = 0_usize;
         let (y,m,d,h,min,s,_) = match &self.data { 
             Location::Mem(_) => {
@@ -440,7 +440,7 @@ impl ZipEntry {
                 simtime::get_datetime(1970, self.modified)
             }
             Location::Disk(ref path) => {
-                let metadata = fs::metadata(&*path).map_err(|e| format!{"no metadata for {path:?} - {e}"})?;
+                let metadata = fs::metadata(&*path)?;
                 if metadata.permissions().readonly() {
                     self.attributes.insert(Attribute::NoWrite);
                 }
@@ -453,36 +453,36 @@ impl ZipEntry {
                 self.uid = metadata.uid();
                 self.gid = metadata.gid();
                 self.created = metadata.
-                  created().map_err(|e| format!{"no created {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as _;
+                  created()? .duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as _;
                 }
                 let timestamp = metadata.
-                  modified().map_err(|e| format!{"no modified {e}"})? .duration_since(SystemTime::UNIX_EPOCH).unwrap();
+                  modified()? .duration_since(SystemTime::UNIX_EPOCH).unwrap();
                 self.modified =  timestamp.as_secs();
                 simtime::get_datetime(1970, self.modified)
             }
         };
         let time: u16 = (s/2 + (min << 4) + (h << 11)).try_into().unwrap();
-        let mut len = zip_file.write(&time.to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        let mut len = zip_file.write(&time.to_ne_bytes())?;
         assert_eq!(len, 2);
         res += len;
         let date: u16 = (d + (m << 5) + ((y-1980) << 9)).try_into().unwrap();
-        len = zip_file.write(&date.to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&date.to_ne_bytes())?;
         assert_eq!(len, 2);
         res += len;
-        let crc_pos = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
-        len = zip_file.write(&(self.crc.get().to_ne_bytes())).map_err(|e| format!("{e}"))?; 
+        let crc_pos = zip_file.seek(std::io::SeekFrom::Current(0))?;
+        len = zip_file.write(&(self.crc.get().to_ne_bytes()))?; 
         assert_eq!(len, 4);
         res += len;
         // preserve the position to update size after finishing data
         let size_orig = match &self.data { 
             Location::Mem(mem) => mem.len() as _,
-            Location::Disk(ref path) => fs::metadata(&*path).map_err(|e| format!{"no metadata for {path} -  {e}"})?.
+            Location::Disk(ref path) => fs::metadata(&*path)?.
                   len()
         };
-        len = zip_file.write(&(self.len as u32).to_le_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&(self.len as u32).to_le_bytes())?; 
         assert_eq!(len, 4);
         res += len;
-        len = zip_file.write(&(size_orig as u32).to_le_bytes()).map_err(|e| format!("{e}"))?; 
+        len = zip_file.write(&(size_orig as u32).to_le_bytes())?; 
         assert_eq!(len, 4);
         res += len;
         
@@ -531,47 +531,47 @@ impl ZipInfo {
         }
     }
     
-    pub fn store(&mut self) -> Result<(), String> {
+    pub fn store(&mut self) -> io::Result<()> {
         // consider to create with zip_name.<8 random digits>  and rename to zip_name at the end
         // use : little-endian byte order
-        let mut zip_file = File::create(&self.zip_name).map_err(|e| format!("file: {} - {e}", &self.zip_name))?;
+        let mut zip_file = File::create(&self.zip_name)?;
         
         for entry in &mut self.entries {
             entry.store(&zip_file)?;
         }
         let mut len_central = 0_u32;
-        let offset_central_dir = zip_file.seek(std::io::SeekFrom::Current(0)).map_err(|e| format!("{e}"))?;
+        let offset_central_dir = zip_file.seek(std::io::SeekFrom::Current(0))?;
         for entry in &mut self.entries {
             len_central += entry.store_dir(&zip_file)?;
         }
         
         // add - end of central directory record
-        let mut len = zip_file.write(&(0x06054b50_u32 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        let mut len = zip_file.write(&(0x06054b50_u32 .to_ne_bytes()))?;
         assert_eq!(len, 4);
         // disk
-        len = zip_file.write(&(0_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&(0_u16 .to_ne_bytes()))?;
         assert_eq!(len, 2);
         // disk # the dir starts
-        len = zip_file.write(&(0_u16 .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&(0_u16 .to_ne_bytes()))?;
         assert_eq!(len, 2);
         // entries # this disk
-        len = zip_file.write(&(self.entries.len() as u16) .to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&(self.entries.len() as u16) .to_ne_bytes())?;
         assert_eq!(len, 2);
         // entries # all
-        len = zip_file.write(&(self.entries.len() as u16) .to_ne_bytes()).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&(self.entries.len() as u16) .to_ne_bytes())?;
         assert_eq!(len, 2);
         // len central
-        len= zip_file.write(&(len_central .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        len= zip_file.write(&(len_central .to_ne_bytes()))?;
         assert_eq!(len, 4);
         // offset central
-        len = zip_file.write(&((offset_central_dir as u32) .to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&((offset_central_dir as u32) .to_ne_bytes()))?;
         assert_eq!(len, 4);
         let comment_bytes = if let Some(comment) = &self.comment {
            comment.as_bytes() } else { &[] };
-        len = zip_file.write(&((comment_bytes.len() as u16).to_ne_bytes())).map_err(|e| format!("{e}"))?;
+        len = zip_file.write(&((comment_bytes.len() as u16).to_ne_bytes()))?;
         assert_eq!(len, 2);
         if comment_bytes.len() > 0 {
-            len = zip_file.write(&comment_bytes).map_err(|e| format!("{e}"))?;
+            len = zip_file.write(&comment_bytes)?;
             assert_eq!(len, comment_bytes.len())
         }
         Ok(())
