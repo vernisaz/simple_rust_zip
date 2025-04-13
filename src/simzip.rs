@@ -579,20 +579,20 @@ impl ZipInfo {
 }
 
 impl ZipEntry {
-    pub fn new(name: String, data: Vec<u8>) -> ZipEntry {
+    pub fn new(name: impl AsRef<str>, data: Vec<u8>) -> ZipEntry {
         ZipEntry {
-            name: name,
+            name: name.as_ref().into(),
             path: None,
             attributes: HashSet::new(),
             data: Mem(data), ..Default::default()
         }
     }
     
-    pub fn from_file<P: AsRef<Path>>(path: P, zip_path: Option<&String>) -> ZipEntry {
+    pub fn from_file<P: AsRef<Path>>(path: P, zip_path: Option<impl AsRef<str>>) -> ZipEntry {
         let path = path.as_ref();
         ZipEntry {
             name: path.file_name().unwrap().to_str().unwrap().to_string(),
-            path: zip_path.cloned(),
+            path: zip_path.map(|s| s.as_ref().into()),
             attributes: HashSet::new(),
             data: Disk(path.into()), ..Default::default()
         }
