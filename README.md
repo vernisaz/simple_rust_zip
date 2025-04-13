@@ -18,7 +18,7 @@ zip.add(simzip::ZipEntry::new(".gitignore", r#"src/test
 test.zip"#.as_bytes().to_vec()));
 ```
 Or:
-```
+```rust
 zip.add(simzip::ZipEntry::from_file("README.md", Some("doc")));
 ```
 for files. Finally you can store the zip in the file system by calling:
