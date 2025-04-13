@@ -3,7 +3,7 @@ extern crate libdeflater;
 #[cfg(feature = "deflate")]
 use libdeflater::{Compressor, CompressionLvl};
 use std::{collections::HashSet,
-path::Path,
+path::{Path,PathBuf},
 fs::{self, File},
 io::{self, Write, Seek, Read, Error, ErrorKind},
 time::{SystemTime},
@@ -37,7 +37,7 @@ pub enum Compression {
 
 #[derive(Debug)]
 pub enum Location {
-    Disk(String),
+    Disk(PathBuf),
     Mem(Vec<u8>),
 }
 
@@ -84,7 +84,7 @@ pub struct ZipEntry {
 
 #[derive(Default)]
 pub struct ZipInfo {
-    pub zip_name: String,
+    pub zip_name: PathBuf,
     directory: Option<HashSet<DirEntry>>,
     pub comment: Option<String>,
     entries: Vec<ZipEntry>,
@@ -492,18 +492,18 @@ impl ZipEntry {
 }
 
 impl ZipInfo {
-    pub fn new(name: String) -> ZipInfo {
+    pub fn new<P: AsRef<Path>>(name: P) -> ZipInfo {
         ZipInfo {
-            zip_name: name,
+            zip_name: name.as_ref().into(),
             comment: None,
             ..Default::default()
         }
     }
     
-    pub fn new_with_comment(name: String, comment: String) -> ZipInfo {
+    pub fn new_with_comment<P: AsRef<Path>>(name: P, comment: &str) -> ZipInfo {
         ZipInfo {
-            zip_name: name,
-            comment: Some(comment),
+            zip_name: name.as_ref().into(),
+            comment: Some(comment.to_string()),
             ..Default::default()
         }
     }
@@ -588,13 +588,13 @@ impl ZipEntry {
         }
     }
     
-    pub fn from_file(path: &String, zip_path: Option<&String>) -> ZipEntry {
-        let p = Path::new(path);
+    pub fn from_file<P: AsRef<Path>>(path: P, zip_path: Option<&String>) -> ZipEntry {
+        let path = path.as_ref();
         ZipEntry {
-            name: p.file_name().unwrap().to_str().unwrap().to_string(),
+            name: path.file_name().unwrap().to_str().unwrap().to_string(),
             path: zip_path.cloned(),
             attributes: HashSet::new(),
-            data: Disk(path.to_owned()), ..Default::default()
+            data: Disk(path.into()), ..Default::default()
         }
     }
 }
