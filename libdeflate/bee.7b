@@ -1,11 +1,11 @@
 # 7bee (RustBee) script for building the deflate dependency
 # RB version 1.13 or better is required
-# libdeflate: git clone https://github.com/adamkewley/libdeflater.git
+# libdeflate: git clone https://github.com/ebiggers/libdeflate.git
 #
-# libdeflater git clone https://github.com/adamkewley/libdeflater
+# libdeflater git clone https://github.com/adamkewley/libdeflater.git
 # edit bee.7b in this directory specifying a location just cloned repositoies and
 #  the common crate location as the crates_dir
-# build - rb
+# build: rb
 # TODO incorprate it in the main script by include()
 
 lib_deflate_dir=..${~/~}..${~/~}side${~/~}libdeflate
