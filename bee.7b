@@ -78,7 +78,7 @@ target simple_zip:src {
 	 -C, opt-level=2,
 	 -L, crates_dir,
 	 --crate-type=lib,
-	 --edition, 2021,
+	 --edition, 2024,
 	 dep_crates,
 	 --crate-name, crate,
      --out-dir, crates_dir,
