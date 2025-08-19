@@ -44,9 +44,10 @@ writing.
 
 ## Building the crate
 
-Obtain the RustBee first. It's an alternative tool for Cargo. You may need to build it for your platform. 
-The building is a clearly simple and explained [here](https://gitlab.com/tools6772135/rusthub/-/blob/master/src/rust/rustcgi/README.md).
-The crate has one dependency. It gets built as a part of a building of the RustBee. Just verify that the right RustBee repository location is
+Obtain the [RustBee](https://github.com/vernisaz/rust_bee) first. It's an alternative tool for Cargo. You may need to build it for your platform. 
+
+The crate has one dependency [simtime](https://github.com/vernisaz/simtime). 
+It has to be build in the common location
 specified in [bee.7b](https://github.com/vernisaz/simple_rust_zip/blob/ce7bf7385eef7d8bd84690b7fefe82f2a0275d9f/bee.7b#L2).
 
 **rb** will create the **simzip** crate.
