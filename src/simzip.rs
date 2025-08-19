@@ -439,7 +439,7 @@ impl ZipEntry {
                 self.modified = current.as_secs() as _;
                 simtime::get_datetime(1970, self.modified)
             }
-            Location::Disk(ref path) => {
+            Location::Disk(path) => {
                 let metadata = fs::metadata(&*path)?;
                 if metadata.permissions().readonly() {
                     self.attributes.insert(Attribute::NoWrite);
@@ -476,7 +476,7 @@ impl ZipEntry {
         // preserve the position to update size after finishing data
         let size_orig = match &self.data { 
             Location::Mem(mem) => mem.len() as _,
-            Location::Disk(ref path) => fs::metadata(&*path)?.
+            Location::Disk(path) => fs::metadata(&*path)?.
                   len()
         };
         len = zip_file.write(&(self.len as u32).to_le_bytes())?; 
