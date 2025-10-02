@@ -6,7 +6,8 @@
 # edit bee.7b in this directory specifying a location just cloned repositoies and
 #  the common crate location as the crate_dir
 # build: rb
-# TODO incorprate it in the main script by include()
+
+# TODO incorprate the script in the main script by include()
 
 side_dir=..${~/~}side
 lib_deflate_dir=${side_dir}${~/~}libdeflate
