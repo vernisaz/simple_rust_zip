@@ -4,13 +4,15 @@
 #
 # libdeflater git clone https://github.com/adamkewley/libdeflater.git
 # edit bee.7b in this directory specifying a location just cloned repositoies and
-#  the common crate location as the crates_dir
+#  the common crate location as the crate_dir
 # build: rb
-# TODO incorprate it in the main script by include()
 
-lib_deflate_dir=..${~/~}..${~/~}side${~/~}libdeflate
-deflater_dir=..${~/~}..${~/~}side${~/~}libdeflater
-crates_dir=..${~/~}..${~/~}crates
+# TODO incorprate the script in the main script by include()
+
+side_dir=..${~/~}side
+lib_deflate_dir=${side_dir}${~/~}libdeflate
+deflater_dir=${side_dir}${~/~}libdeflater
+crate_dir=..${~/~}crates
 
 crate=libdeflater 
 dep crate=libdeflate_sys
@@ -20,8 +22,8 @@ dep_crates=[--extern,libdeflate_sys]
 canonicalize(lib_deflate_dir)
 assign(lib_deflate_dir_can,~~)
 
-canonicalize(crates_dir)
-assign(crates_dir_can,~~)
+canonicalize(crate_dir)
+assign(crate_dir_can,~~)
 
 canonicalize(deflater_dir)
 assign(deflater_dir_can,~~)
@@ -32,7 +34,7 @@ assign(crate_compile dir,${deflater_dir_can}${~/~}src)
 
 target clean:: {
      dependency{}
-     rm(${crates_dir_can}${~/~}liblibdeflate_sys.rlib,${crates_dir_can}${~/~}liblibdeflater.rlib)
+     rm(${crate_dir_can}${~/~}liblibdeflate_sys.rlib,${crate_dir_can}${~/~}liblibdeflater.rlib)
 }
 
 target test:compile test dir {
@@ -47,14 +49,14 @@ target compile test:compile test dir {
        or {
        anynewer(..${~/~}bee.7b,test)
        anynewer(${~cwd~}${~/~}gz_compress.rs,${~cwd~}${~/~}test)
-       anynewer(${crates_dir_can}${~/~}lib${crate}.rlib,${~cwd~}${~/~}test)
+       anynewer(${crate_dir_can}${~/~}lib${crate}.rlib,${~cwd~}${~/~}test)
        }
    }
 
    display(Compiling test ...)
    exec rustc::  (
        --color, always,
-       -L,all=crates_dir_can,
+       -L,all=crate_dir_can,
        --extern, crate,
        -o,
        test,
@@ -94,10 +96,10 @@ target deflate : lib_deflate_dir_can {
 
 target dep_crate_comp:dep_crate_comp dir {
     dependency{
-    	anynewer(${~cwd~}${~/~}*.rs,${crates_dir_can}${~/~}lib${dep crate}.rlib)
+    	anynewer(${~cwd~}${~/~}*.rs,${crate_dir_can}${~/~}lib${dep crate}.rlib)
     }
     dependency{target(deflate)}
-	display(Building crate ${dep crate} in ${crates_dir}${~/~}lib${crate}.rlib)
+	display(Building crate ${dep crate} in ${crate_dir}${~/~}lib${crate}.rlib)
 	exec rustc::  (
 	  --color, always,
 	 -C, opt-level=0,
@@ -106,7 +108,7 @@ target dep_crate_comp:dep_crate_comp dir {
      -L, ${lib_deflate_dir_can}${~/~}build,
      -l, static=deflate,
 	 --crate-name, dep crate,
-     --out-dir, crates_dir_can,
+     --out-dir, crate_dir_can,
      lib.rs
    )
    if {
@@ -120,7 +122,7 @@ target dep_crate_comp:dep_crate_comp dir {
 target dev : {
 	dependency{crate_compile}
 	
-	display(crates dir: ${crates_dir_can})
+	display(crates dir: ${crate_dir_can})
 	display(deflate dir: ${lib_deflate_dir_can})
 	display(deflater dir: ${deflater_dir_can})
 }
@@ -128,18 +130,18 @@ target dev : {
 target crate_compile:crate_compile dir {
     dependency { target(dep_crate_comp)}
     dependency{
-    	anynewer(${~cwd~}${~/~}*.rs,${crates_dir_can}${~/~}lib${crate}.rlib)
+    	anynewer(${~cwd~}${~/~}*.rs,${crate_dir_can}${~/~}lib${crate}.rlib)
     }
-	display(Building crate ${crate} in ${crates_dir}${~/~}lib${crate}.rlib)
+	display(Building crate ${crate} in ${crate_dir}${~/~}lib${crate}.rlib)
 	exec rustc::  (
 	  --color, always,
 	 -C, opt-level=0,
-	 -L, crates_dir_can,
+	 -L, crate_dir_can,
 	 --crate-type=lib,
 	 --edition, 2024,
 	 dep_crates,
 	 --crate-name, crate,
-     --out-dir, crates_dir_can,
+     --out-dir, crate_dir_can,
      lib.rs
    )
    if {

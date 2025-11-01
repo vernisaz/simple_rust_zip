@@ -1,13 +1,13 @@
 crate=simzip
-crates_dir=..${~/~}crates
-dep_crates=[--extern,time=${crates_dir}${~/~}libtime.rlib] #,--extern,libdeflater=${crates_dir}/liblibdeflater.rlib]
+crate_dir=..${~/~}crates
+dep_crates=[--extern,time=${crate_dir}${~/~}libtime.rlib] #,--extern,libdeflater=${crate_dir}/liblibdeflater.rlib]
 use deflater=true
 unix test=!true
 
 feat=[]
 
-absolute(crates_dir)
-assign(crates_dir,~~)
+absolute(crate_dir)
+assign(crate_dir,~~)
 
 target test {
 	dependency{target(compile test)}
@@ -22,7 +22,7 @@ target compile test:src {
        or {
        anynewer(..${~/~}bee.7b,test)
        anynewer(${~cwd~}${~/~}test.rs,${~cwd~}${~/~}test)
-       anynewer(${crates_dir}${~/~}lib${crate}.rlib,${~cwd~}${~/~}test)
+       anynewer(${crate_dir}${~/~}lib${crate}.rlib,${~cwd~}${~/~}test)
        }
    }
 
@@ -38,7 +38,7 @@ target compile test:src {
 	assign(feat,~~)
     exec rustc::  (
        --color, always,
-       -L,all=${crates_dir},
+       -L,all=${crate_dir},
        --extern, simzip,
        feat,
        -o,
@@ -55,17 +55,17 @@ target compile test:src {
 
 target clean {
 	dependency{true}
-	rm (${crates_dir}${~/~}lib${crate}.rlib)
+	rm (${crate_dir}${~/~}lib${crate}.rlib)
 }
 
 target simple_zip:src {
     dependency{
         or{
-        	anynewer(${~cwd~}${~/~}*.rs,${crates_dir}${~/~}lib${crate}.rlib)
-        	anynewer(..${~/~}bee.7b,${crates_dir}${~/~}lib${crate}.rlib)
+        	anynewer(${~cwd~}${~/~}*.rs,${crate_dir}${~/~}lib${crate}.rlib)
+        	anynewer(..${~/~}bee.7b,${crate_dir}${~/~}lib${crate}.rlib)
         }
     }
-	display(Building crate ${crate} in ${crates_dir}${~/~}lib${crate}.rlib)
+	display(Building crate ${crate} in ${crate_dir}${~/~}lib${crate}.rlib)
 	if {
 		eq(use deflater,true)
 		then {
@@ -76,12 +76,12 @@ target simple_zip:src {
 	exec rustc::  (
 	  --color, always,
 	 -C, opt-level=2,
-	 -L, crates_dir,
+	 -L, crate_dir,
 	 --crate-type=lib,
 	 --edition, 2024,
 	 dep_crates,
 	 --crate-name, crate,
-     --out-dir, crates_dir,
+     --out-dir, crate_dir,
      feat,
      lib.rs
    )

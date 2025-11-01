@@ -55,13 +55,13 @@ You may need to build it for your platform. (Since **RustBee** uses the crate fo
 also gets built as a part of its bootstraping procedure)
 
 The crate has one dependency [simtime](https://github.com/vernisaz/simtime). 
-It has to be build in the common location
-specified in [bee.7b](https://github.com/vernisaz/simple_rust_zip/blob/ce7bf7385eef7d8bd84690b7fefe82f2a0275d9f/bee.7b#L2).
+It has to be built in the common location
+specified in [bee.7b](https://github.com/vernisaz/simple_rust_zip/blob/master/bee.7b) as `crate_dir` variable.
 
 Running the **rb** will create the **simzip** crate.
 
 if you plan to *deflat* zip entires, then set the build script variable "use deflater" to **true** (default value). 
-Use *deflater* [bee.7b](./libdeflate/bee.7b) to buiild the required crate. Read instructions inside the *bee.7b* how to build it.
+Use *deflater*/[bee.7b](./libdeflate/bee.7b) to buiild the required crate. Read instructions inside the *bee.7b* how to build it.
 
 ## Future
 
