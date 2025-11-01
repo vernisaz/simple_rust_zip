@@ -60,7 +60,9 @@ specified in [bee.7b](https://github.com/vernisaz/simple_rust_zip/blob/master/be
 
 Running the **rb** will create the **simzip** crate.
 
-if you plan to *deflat* zip entires, then set the build script variable `use deflater` to `true` (default value). 
+if you plan to *deflat* zip entires, then set 
+[the build script](https://github.com/vernisaz/simple_rust_zip/blob/1a254f6cbbaf4f6960e576d658f0c243ecc66834/bee.7b#L4)
+variable `use deflater` to `true` (default value). 
 Use *deflater/bee.7b* to buiild the *libdeflater* crate. Read instructions inside the [bee.7b](./libdeflate/bee.7b) how to build it.
 
 ## Future
