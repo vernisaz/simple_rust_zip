@@ -58,6 +58,28 @@ target clean {
 	rm (${crate_dir}${~/~}lib${crate}.rlib)
 }
 
+target clippy:src {
+	dependency{ target(simple_zip)}
+    dependency {}
+    exec clippy-driver::  (
+	  --color, always,
+	 -C, opt-level=3,
+	 -L, crate_dir,
+	 --crate-type=lib,
+	 --edition, 2024,
+	 dep_crates,
+	 --crate-name, crate,
+     lib.rs
+   )
+   if {
+         neq(${~~}, 0)
+         then {
+            panic("Clipping ${crate} error(s)")
+         }
+   }
+	
+}
+
 target simple_zip:src {
     dependency{
         or{
@@ -75,7 +97,7 @@ target simple_zip:src {
 	}
 	exec rustc::  (
 	  --color, always,
-	 -C, opt-level=2,
+	 -C, opt-level=3,
 	 -L, crate_dir,
 	 --crate-type=lib,
 	 --edition, 2024,

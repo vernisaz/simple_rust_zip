@@ -5,7 +5,7 @@ use libdeflater::{Compressor, CompressionLvl};
 use std::{collections::HashSet,
 path::{Path,PathBuf},
 fs::{self, File},
-io::{self, Write, Seek, Read, Error, ErrorKind},
+io::{self, Write, Seek, Read, Error},
 time::{SystemTime},
 hash::{Hash, Hasher},
 cell::Cell,
@@ -117,7 +117,7 @@ impl ZipEntry {
     fn store(&mut self, mut zip_file: &File) -> io::Result<usize> {
         let mut res = 0_usize;
         // TODO impl zip64
-        self.offset = zip_file.seek(std::io::SeekFrom::Current(0))? as u32;
+        self.offset = zip_file.stream_position()? as u32;
         let mut len = zip_file.write(&(0x504b0304_u32 .to_be_bytes()))?;
         assert_eq!(len, 4);
         res += len;
@@ -132,7 +132,7 @@ impl ZipEntry {
         len = zip_file.write(&self.compression.value().to_ne_bytes())?; 
         assert_eq!(len, 2);
         res += len;
-        let (comm_len,crc_pos) = self.write_common(&zip_file)?;
+        let (comm_len,crc_pos) = self.write_common(zip_file)?;
         len = comm_len;
         res += len;
         let combined_name = match &self.path {
@@ -155,7 +155,7 @@ impl ZipEntry {
                 (0, self.created, 0)
             }
             Location::Disk(path) => {
-                let metadata = fs::metadata(&*path)?;
+                let metadata = fs::metadata(path)?;
                 (metadata.atime() as _,metadata.ctime() as _,metadata.mtime() as _)
             }
         };
@@ -183,7 +183,7 @@ impl ZipEntry {
         len = zip_file.write(&extra_len.to_ne_bytes())?; // extra fields
         assert_eq!(len, 2);
         res += len;
-        len = zip_file.write(&name_bytes)?;
+        len = zip_file.write(name_bytes)?;
         assert_eq!(len, name_bytes.len());
         res += len;
         // write extra headers here
@@ -221,9 +221,9 @@ impl ZipEntry {
             Location::Mem(mem) => {
                 match self.compression {
                     Compression::Store => {
-                        len = zip_file.write(&mem)?;
+                        len = zip_file.write(mem)?;
                         assert_eq!(len, mem.len());
-                        self.crc = crc32::update_fast_16(0/*u32::MAX*/, &mem).into()
+                        self.crc = crc32::update_fast_16(0/*u32::MAX*/, mem).into()
                     }
                     #[cfg(feature = "deflate")]
                     Compression::Deflate => {
@@ -237,7 +237,7 @@ impl ZipEntry {
                         assert_eq!(len, compressed_data.len()); 
                         self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
-                    _ => return Err(Error::new(ErrorKind::Other, format!{"compression {:?} isn't supported yet", self.compression}))
+                    _ => return Err(Error::other(format!{"compression {:?} isn't supported yet", self.compression}))
                 }
                 // compressed len
                 self.len = len as u32;
@@ -266,14 +266,14 @@ impl ZipEntry {
                         assert_eq!(len, compressed_data.len());
                         self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
-                    _ => return Err(Error::new(ErrorKind::Other, format!{"compression {:?} isn't supported yet", self.compression}))
+                    _ => return Err(Error::other(format!{"compression {:?} isn't supported yet", self.compression}))
                 }
                 self.len = len as u32;
                 res += len;
             }
         }
         // update crc , save current pos
-        let current_pos = zip_file.seek(std::io::SeekFrom::Current(0))?;
+        let current_pos = zip_file.stream_position()?;
         
         zip_file.seek(std::io::SeekFrom::Start(crc_pos))?;
         len = zip_file.write(&self.crc.get().to_ne_bytes())?; 
@@ -361,7 +361,7 @@ impl ZipEntry {
         len = zip_file.write(&self.offset.to_ne_bytes())?; // extra fields
         assert_eq!(len, 4);
         res += len;
-        len = zip_file.write(&name_bytes)?;
+        len = zip_file.write(name_bytes)?;
         assert_eq!(len, name_bytes.len());
         res += len;
         //  writing extra headers
@@ -419,12 +419,12 @@ impl ZipEntry {
                 extra_len -= len as u16;
             }
             if extra_len > 0 {
-                return Err(Error::new(ErrorKind::Other, format!{"not correct extra headers len calculation, {extra_len} extra"}))
+                return Err(Error::other(format!{"not correct extra headers len calculation, {extra_len} extra"}))
             }
         }
         // comment
         if comment_bytes.len() > 0 {
-           len = zip_file.write(&comment_bytes)?;
+           len = zip_file.write(comment_bytes)?;
             assert_eq!(len, comment_bytes.len());
             res += len; 
         }
@@ -440,7 +440,7 @@ impl ZipEntry {
                 simtime::get_datetime(1970, self.modified)
             }
             Location::Disk(path) => {
-                let metadata = fs::metadata(&*path)?;
+                let metadata = fs::metadata(path)?;
                 if metadata.permissions().readonly() {
                     self.attributes.insert(Attribute::NoWrite);
                 }
@@ -469,14 +469,14 @@ impl ZipEntry {
         len = zip_file.write(&date.to_ne_bytes())?;
         assert_eq!(len, 2);
         res += len;
-        let crc_pos = zip_file.seek(std::io::SeekFrom::Current(0))?;
+        let crc_pos = zip_file.stream_position()?;
         len = zip_file.write(&(self.crc.get().to_ne_bytes()))?; 
         assert_eq!(len, 4);
         res += len;
         // preserve the position to update size after finishing data
         let size_orig = match &self.data { 
             Location::Mem(mem) => mem.len() as _,
-            Location::Disk(path) => fs::metadata(&*path)?.
+            Location::Disk(path) => fs::metadata(path)?.
                   len()
         };
         len = zip_file.write(&(self.len as u32).to_le_bytes())?; 
@@ -540,7 +540,7 @@ impl ZipInfo {
             entry.store(&zip_file)?;
         }
         let mut len_central = 0_u32;
-        let offset_central_dir = zip_file.seek(std::io::SeekFrom::Current(0))?;
+        let offset_central_dir = zip_file.stream_position()?;
         for entry in &mut self.entries {
             len_central += entry.store_dir(&zip_file)?;
         }
@@ -571,7 +571,7 @@ impl ZipInfo {
         len = zip_file.write(&((comment_bytes.len() as u16).to_ne_bytes()))?;
         assert_eq!(len, 2);
         if comment_bytes.len() > 0 {
-            len = zip_file.write(&comment_bytes)?;
+            len = zip_file.write(comment_bytes)?;
             assert_eq!(len, comment_bytes.len())
         }
         Ok(())
