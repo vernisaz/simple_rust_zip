@@ -423,7 +423,7 @@ impl ZipEntry {
             }
         }
         // comment
-        if comment_bytes.len() > 0 {
+        if !comment_bytes.is_empty() {
            len = zip_file.write(comment_bytes)?;
             assert_eq!(len, comment_bytes.len());
             res += len; 
@@ -435,7 +435,7 @@ impl ZipEntry {
         let mut res = 0_usize;
         let (y,m,d,h,min,s,_) = match &self.data { 
             Location::Mem(_) => {
-                let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+                let current = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default();
                 self.modified = current.as_secs() as _;
                 simtime::get_datetime(1970, self.modified)
             }
@@ -479,7 +479,7 @@ impl ZipEntry {
             Location::Disk(path) => fs::metadata(path)?.
                   len()
         };
-        len = zip_file.write(&(self.len as u32).to_le_bytes())?; 
+        len = zip_file.write(&(self.len).to_le_bytes())?; 
         assert_eq!(len, 4);
         res += len;
         len = zip_file.write(&(size_orig as u32).to_le_bytes())?; 
@@ -570,7 +570,7 @@ impl ZipInfo {
            comment.as_bytes() } else { &[] };
         len = zip_file.write(&((comment_bytes.len() as u16).to_ne_bytes()))?;
         assert_eq!(len, 2);
-        if comment_bytes.len() > 0 {
+        if !comment_bytes.is_empty() {
             len = zip_file.write(comment_bytes)?;
             assert_eq!(len, comment_bytes.len())
         }
