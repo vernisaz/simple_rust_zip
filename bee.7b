@@ -55,7 +55,7 @@ target compile test:src {
 
 target clean {
 	dependency{true}
-	rm (${crate_dir}${~/~}lib${crate}.rlib)
+	rm (${crate_dir}${~/~}lib${crate}.rlib,${crate_dir}${~/~}liblibdeflater.rlib)
 }
 
 target clippy:src {

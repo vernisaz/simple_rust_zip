@@ -9,10 +9,10 @@
 
 # TODO incorprate the script in the main script by include()
 
-side_dir=..${~/~}side
+side_dir=..${~/~}..${~/~}side
 lib_deflate_dir=${side_dir}${~/~}libdeflate
 deflater_dir=${side_dir}${~/~}libdeflater
-crate_dir=..${~/~}crates
+crate_dir=..${~/~}..${~/~}crates
 
 crate=libdeflater 
 dep crate=libdeflate_sys
