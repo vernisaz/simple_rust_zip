@@ -5,6 +5,8 @@ use deflater=true
 unix test=!true
 
 feat=[]
+version=1.12b25
+set_env(VERSION,version)
 
 absolute(crate_dir)
 assign(crate_dir,~~)
