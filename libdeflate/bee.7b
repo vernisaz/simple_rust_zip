@@ -6,6 +6,8 @@
 # edit bee.7b in this directory specifying a location just cloned repositoies and
 #  the common crate location as the crate_dir
 # build: rb
+# note: you may need 'cmake' installed using 'sudo apt install -y cmake'
+
 
 # TODO incorprate the script in the main script by include()
 
@@ -77,14 +79,14 @@ target deflate : lib_deflate_dir_can {
        }
     }
     display(${~cwd~} <= ${lib_deflate_dir_can})
-	exec cmake (cmake -B build)
+	exec cmake (-B, build)
 	if {
          neq(~~, 0)
          then {
             panic("cmake error(s)")
          }
      }
-	exec cmake (cmake --build build)
+	exec cmake (--build, build)
 	if {
          neq(~~, 0)
          then {
@@ -109,7 +111,7 @@ target dep_crate_comp:dep_crate_comp dir {
      -l, static=deflate,
 	 --crate-name, dep crate,
      --out-dir, crate_dir_can,
-     lib.rs
+     ${~cwd~}${~/~}lib.rs
    )
    if {
          neq(${~~}, 0)
