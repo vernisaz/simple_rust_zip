@@ -1,9 +1,9 @@
-# The crate for a simple zipping - simple_rust_zip
+# The crate for a simple zipping - simple\_rust_zip
 
 ## Why
 
-There are many good implementations of a zipping, however they are too
-good. I need something very basic and simple.
+There are many good implementations of a zipping, however they can be overhead
+in many cases. This crate fills the niche.
 
 ##  How to use
 
@@ -21,7 +21,7 @@ Or from a file content:
 ```rust
 zip.add(simzip::ZipEntry::from_file("README.md", Some("doc")));
 ```
-A zip entry attributes can be changed using the technique:
+A zip entry attributes can be changed using the followin technique:
 ```rust
 entry.attributes.insert(simzip::Attribute::Exec);
 ```
