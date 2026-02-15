@@ -6,7 +6,7 @@ use std::{collections::HashSet,
 path::{Path,PathBuf},
 fs::{self, File},
 io::{self, Write, Seek, Read, Error},
-time::{SystemTime},
+time::{SystemTime,UNIX_EPOCH},
 hash::{Hash, Hasher},
 cell::Cell,
 };
@@ -114,6 +114,7 @@ impl Compression {
 // info: https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
 // https://users.cs.jmu.edu/buchhofp/forensics/formats/pkzip-printable.html
 impl ZipEntry {
+    /// stores zip file on disk
     fn store(&mut self, mut zip_file: &File) -> io::Result<usize> {
         let mut res = 0_usize;
         // TODO impl zip64
@@ -231,7 +232,7 @@ impl ZipEntry {
                         let max_sz = compressor.deflate_compress_bound(mem.len());
                         let mut compressed_data = Vec::new();
                         compressed_data.resize(max_sz, 0);
-                        let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).unwrap();
+                        let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).map_err(|e| Error::other(format!("because {e}")))?;
                         compressed_data.resize(actual_sz, 0);
                         len = zip_file.write(&compressed_data)?;
                         assert_eq!(len, compressed_data.len()); 
@@ -260,7 +261,7 @@ impl ZipEntry {
                         let max_sz = compressor.deflate_compress_bound(mem.len());
                         let mut compressed_data = Vec::new();
                         compressed_data.resize(max_sz, 0);
-                        let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).unwrap();
+                        let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).map_err(|e| Error::other(format!("because {e}")))?;
                         compressed_data.resize(actual_sz, 0);
                         len = zip_file.write(&compressed_data)?;
                         assert_eq!(len, compressed_data.len());
@@ -453,19 +454,19 @@ impl ZipEntry {
                 self.uid = metadata.uid();
                 self.gid = metadata.gid();
                 self.created = metadata.
-                  created()? .duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as _;
+                  created()? .duration_since(SystemTime::UNIX_EPOCH).map_err(|e| Error::other(format!("because {e}")))?.as_secs() as _;
                 }
                 let timestamp = metadata.
-                  modified()? .duration_since(SystemTime::UNIX_EPOCH).unwrap();
+                  modified()? .duration_since(SystemTime::UNIX_EPOCH).map_err(|e| Error::other(format!("because {e}")))?;
                 self.modified =  timestamp.as_secs();
                 simtime::get_datetime(1970, self.modified)
             }
         };
-        let time: u16 = (s/2 + (min << 4) + (h << 11)).try_into().unwrap();
+        let time: u16 = (s/2 + (min << 4) + (h << 11)).try_into().map_err(|e| Error::other(format!("because {e}")))?;
         let mut len = zip_file.write(&time.to_ne_bytes())?;
         assert_eq!(len, 2);
         res += len;
-        let date: u16 = (d + (m << 5) + ((y-1980) << 9)).try_into().unwrap();
+        let date: u16 = (d + (m << 5) + ((y-1980) << 9)).try_into().map_err(|e| Error::other(format!("because {e}")))?;
         len = zip_file.write(&date.to_ne_bytes())?;
         assert_eq!(len, 2);
         res += len;
@@ -591,11 +592,16 @@ impl ZipEntry {
     pub fn from_file<P: AsRef<Path>>(path: P, zip_path: Option<impl AsRef<str>>) -> ZipEntry {
         let path = path.as_ref();
         ZipEntry {
-            name: path.file_name().unwrap().to_str().unwrap().to_string(),
+            name: path.file_name().unwrap().to_str().unwrap().to_string(), // TODO handle the situation when no file name
             path: zip_path.map(|s| s.as_ref().into()),
             attributes: HashSet::new(),
             data: Disk(path.into()), ..Default::default()
         }
+    }
+    
+    pub fn created_on(mut self, time: SystemTime) -> Self {
+        self.modified = time.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+        self
     }
 }
 
