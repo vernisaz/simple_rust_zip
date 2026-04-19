@@ -7,7 +7,8 @@
 #  the common crate location as the crate_dir
 # build: rb
 # note: you may need 'cmake' installed using 'sudo apt install -y cmake'
-
+# unless cmake provide in PATH, it can be specified as:
+#cmake=/Users/macuser/cmake/CMake.app/Contents/bin/cmake
 
 # TODO incorprate the script in the main script by include()
 
