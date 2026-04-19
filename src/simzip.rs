@@ -234,8 +234,8 @@ impl ZipEntry {
                         compressed_data.resize(max_sz, 0);
                         let actual_sz = compressor.deflate_compress(&mem, &mut compressed_data).map_err(|e| Error::other(format!("because {e}")))?;
                         compressed_data.resize(actual_sz, 0);
-                        len = zip_file.write(&compressed_data)?;
-                        assert_eq!(len, compressed_data.len()); 
+                        zip_file.write_all(&compressed_data)?;
+                        //assert_eq!(len, compressed_data.len()); 
                         self.crc = crc32::update_slow(0/*u32::MAX*/, &mem).into()
                     }
                     _ => return Err(Error::other(format!{"compression {:?} isn't supported yet", self.compression}))
