@@ -582,7 +582,7 @@ impl ZipEntry {
     pub fn from_file<P: AsRef<Path>>(path: P, zip_path: Option<impl AsRef<str>>) -> ZipEntry {
         let path = path.as_ref();
         ZipEntry {
-            name: path.file_name().unwrap().to_str().unwrap().to_string(), // TODO handle the situation when no file name
+            name: path.file_name().unwrap().display().to_string(), // TODO handle the situation when no file name
             path: zip_path.map(|s| s.as_ref().into()),
             attributes: HashSet::new(),
             data: Disk(path.into()),
