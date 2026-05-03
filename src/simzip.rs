@@ -487,7 +487,7 @@ impl ZipEntry {
 }
 
 impl ZipInfo {
-/// Creates a zip file
+    /// Creates a zip file
     pub fn new<P: AsRef<Path>>(name: P) -> ZipInfo {
         ZipInfo {
             zip_name: name.as_ref().into(),
@@ -495,7 +495,7 @@ impl ZipInfo {
             ..Default::default()
         }
     }
-/// Creates a zip file with a comment
+    /// Creates a zip file with a comment
     pub fn new_with_comment<P: AsRef<Path>>(name: P, comment: &str) -> ZipInfo {
         ZipInfo {
             zip_name: name.as_ref().into(),
@@ -503,13 +503,13 @@ impl ZipInfo {
             ..Default::default()
         }
     }
-    
-/// Set zip behavior to reject an entry duplicate
+
+    /// Set zip behavior to reject an entry duplicate
     pub fn prohibit_duplicates(&mut self) {
         self.directory = Some(HashSet::new())
     }
-    
-/// Add an entry in the zip
+
+    /// Add an entry in the zip
     pub fn add(&mut self, entry: ZipEntry) -> bool {
         match &mut self.directory {
             None => {
@@ -531,7 +531,7 @@ impl ZipInfo {
         }
     }
 
-/// Stores the zip in an external storage
+    /// Stores the zip in an external storage
     pub fn store(&mut self) -> io::Result<()> {
         // consider to create with zip_name.<8 random digits>  and rename to zip_name at the end
         // use : little-endian byte order
@@ -574,7 +574,7 @@ impl ZipInfo {
 }
 
 impl ZipEntry {
-/// Create a zip entry with a byte vector content
+    /// Create a zip entry with a byte vector content
     pub fn new(name: impl AsRef<str>, data: Vec<u8>) -> ZipEntry {
         ZipEntry {
             name: name.as_ref().into(),
@@ -585,7 +585,7 @@ impl ZipEntry {
         }
     }
 
-/// Creates a zip entry from an external file
+    /// Creates a zip entry from an external file
     pub fn from_file<P: AsRef<Path>>(path: P, zip_path: Option<impl AsRef<str>>) -> ZipEntry {
         let path = path.as_ref();
         ZipEntry {
@@ -597,9 +597,9 @@ impl ZipEntry {
         }
     }
 
-/// Modifies a date of the zip entry
-///
-/// Now is used otherwise for a vector entry or a file modified date for an external content
+    /// Modifies a date of the zip entry
+    ///
+    /// Now is used otherwise for a vector entry or a file modified date for an external content
     pub fn created_on(mut self, time: SystemTime) -> Self {
         self.modified = time
             .duration_since(UNIX_EPOCH)
