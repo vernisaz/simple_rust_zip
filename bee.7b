@@ -1,5 +1,6 @@
 crate=simzip
 crate_dir=..${~/~}crates
+doc_dir=..${~/~}..${~/~}docs # relative to src
 dep_crates=[--extern,time=${crate_dir}${~/~}libtime.rlib] #,--extern,libdeflater=${crate_dir}/liblibdeflater.rlib]
 use deflater=true
 unix test=!true
@@ -60,6 +61,35 @@ target clean {
 	rm (${crate_dir}${~/~}lib${crate}.rlib,${crate_dir}${~/~}liblibdeflater.rlib)
 }
 
+target doc:src {
+	dependency{ target(simple_zip)}
+    dependency {}
+    if {
+    	neq(doc_dir,${doc_dir}) then {
+    		assign(doc_dir,..${~/~}doc)
+    	}
+    }
+    display(Documenting crate ${crate} in ${doc_dir} ...)
+	exec rustdoc::(lib.rs,
+		--color, always,
+		--out-dir,
+		doc_dir,
+		--edition, 2024,
+	    --library-path,
+	    crate_dir,
+	    dep_crates,
+	    --crate-name,
+	    crate
+	)
+	if {
+        neq(~~, 0)
+        then {
+            panic("rustdoc error(s)")
+        }
+    }
+    display(Click http://localhost:3000/doc/${crate}/ to view the documentation)
+}
+
 target clippy:src {
 	dependency{ target(simple_zip)}
     dependency {}
@@ -81,6 +111,7 @@ target clippy:src {
    }
 	
 }
+
 
 target simple_zip:src {
     dependency{
