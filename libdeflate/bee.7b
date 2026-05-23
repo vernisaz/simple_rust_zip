@@ -3,8 +3,8 @@
 # libdeflate: git clone https://github.com/ebiggers/libdeflate.git
 #
 # libdeflater git clone https://github.com/adamkewley/libdeflater.git
-# edit bee.7b in this directory specifying a location just cloned repositoies and
-#  the common crate location as the crate_dir
+# edit bee.7b (this file) in this directory specifying a location  
+# just cloned repositoies and the common crate location as the crate_dir
 # build: rb
 # note: you may need 'cmake' installed using 'sudo apt install -y cmake'
 # unless cmake provide in PATH, it can be specified as:
