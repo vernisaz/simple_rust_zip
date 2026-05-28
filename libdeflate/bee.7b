@@ -1,5 +1,6 @@
 # 7bee (RustBee) script for building the deflate dependency
 # RB version 1.13 or better is required
+#
 # libdeflate: git clone https://github.com/ebiggers/libdeflate.git
 #
 # libdeflater git clone https://github.com/adamkewley/libdeflater.git
@@ -7,7 +8,7 @@
 # just cloned repositoies and the common crate location as the crate_dir
 # build: rb
 # note: you may need 'cmake' installed using 'sudo apt install -y cmake'
-# unless cmake provide in PATH, it can be specified as:
+# unless cmake is provided in PATH, it can be specified explicitly as:
 #cmake=/Users/macuser/cmake/CMake.app/Contents/bin/cmake
 
 # TODO incorprate the script in the main script by include()
