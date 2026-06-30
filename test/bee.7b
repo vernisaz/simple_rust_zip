@@ -10,6 +10,8 @@ common_test =..${~/~}..${~/~}simscript${~/~}comm-test.7b:file
 crate_dir=..${~/~}..${~/~}crates
 doc_dir=..${~/~}..${~/~}docs
 
+version=1.00a(004)
+set_env(VERSION,version)
 
 include(common);
 include(common_test);
