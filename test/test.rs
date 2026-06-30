@@ -2,6 +2,8 @@ extern crate simcli;
 extern crate simcolor;
 use crate::simcolor::Colorized;
 use simcli::{CLI, OptTyp, OptVal};
+#[cfg(target_os = "windows")]
+use simcli::WildCardExpansion;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs::File;
@@ -17,6 +19,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .opt("l", OptTyp::None)?
         .alias("-list")?
         .description("Show the archive directory");
+    #[cfg(target_os = "windows")]
+    cli.process_wildcard(WildCardExpansion::Once);
     if cli.get_opt("v").unwrap() == Some(&OptVal::Empty) {
         println!(
             "Zipdir version {} © {} D. Rogatkin",
