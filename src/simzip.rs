@@ -127,7 +127,9 @@ impl ZipEntry {
         res += 2;
         // flags
         // set to 0x08 and then add a data descriptor after data 3x4 bytes
-        zip_file.write_all(&0_u16.to_ne_bytes())?; // flags
+        let mut flags = 0_u16;
+        flags |= 1 << 11; // utf8
+        zip_file.write_all(&flags.to_ne_bytes())?; // flags
         res += 2;
         zip_file.write_all(&self.compression.value().to_ne_bytes())?;
         res += 2;
@@ -193,7 +195,6 @@ impl ZipEntry {
         {
             zip_file.write_all(&(0x5455_u16.to_ne_bytes()))?; // OS
             res += 2;
-
             zip_file.write_all(&(((1 + time_headers * 4) as u16).to_ne_bytes()))?; // OS
             res += 2;
             zip_file.write_all(&(mask.to_ne_bytes()))?; // OS
@@ -296,7 +297,9 @@ impl ZipEntry {
         res += 2;
         zip_file.write_all(&VER_EXTRACT.to_ne_bytes())?; // version 2.0
         res += 2;
-        zip_file.write_all(&0_u16.to_ne_bytes())?; //
+        let mut flags = 0_u16;
+        flags |= 1 << 11; // utf8
+        zip_file.write_all(&flags.to_ne_bytes())?; // flags
         res += 2;
         zip_file.write_all(&self.compression.value().to_ne_bytes())?;
         res += 2;

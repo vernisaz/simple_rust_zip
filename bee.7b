@@ -6,7 +6,7 @@ use deflater=true
 unix test=!true
 
 feat=[]
-version=1.12b27
+version=1.13b28
 set_env(VERSION,version)
 
 absolute(crate_dir)
