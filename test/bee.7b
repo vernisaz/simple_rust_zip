@@ -1,0 +1,15 @@
+# build the simple tzip crate - https://github.com/lovasoa/tinyzip
+crate  =tzip
+crate main=lib
+dep_crates=[]
+comp opts=[--cfg,feature="std"]
+crate_src=src
+test file=test
+common =..${~/~}..${~/~}simscript${~/~}comm-crate.7b:file
+common_test =..${~/~}..${~/~}simscript${~/~}comm-test.7b:file
+crate_dir=..${~/~}..${~/~}crates
+doc_dir=..${~/~}..${~/~}docs
+
+
+include(common);
+include(common_test);
