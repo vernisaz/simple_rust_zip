@@ -13,6 +13,7 @@ use std::fs::{self, File};
 use std::io;
 use std::io::Read;
 use std::path::PathBuf;
+const MAX_NAME_LEN: usize = 1024;
 use tzip::{Archive, Compression};
 fn main() -> Result<(), Box<dyn Error>> {
     let mut cli = CLI::new();
@@ -56,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let zip_file = File::open(&cli.args()[0])?;
     let arc = Archive::try_from(zip_file)?;
-    let mut scratch = [0u8; 1024];
+    let mut scratch = [0u8; MAX_NAME_LEN];
     let extract = cli.get_opt("e").unwrap() == Some(&OptVal::Empty);
     let max = if let Some(OptVal::Num(max)) = cli.get_opt("m").unwrap()
         && *max > 1
@@ -74,12 +75,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         } else {
             return Err("Destination path doesn't exist or invalid".into());
         }
+    } else if let Ok(dest) = env::current_dir() {
+        dest
     } else {
-        if let Ok(dest) = env::current_dir() {
-            dest
-        } else {
-            return Err("No current directory".into());
-        }
+        return Err("No current directory".into());
     };
     let over = cli.get_opt("w").unwrap() == Some(&OptVal::Empty);
     let exclud = cli.get_opt("x").unwrap() == Some(&OptVal::Empty);
