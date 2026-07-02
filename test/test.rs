@@ -51,11 +51,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
     if cli.args().is_empty() || cli.get_opt("h").unwrap() == Some(&OptVal::Empty) {
-        println!("Usage: zipdir [opts] <file>");
+        println!("Usage: zipdir [opts] <file> [<content_file>...]");
         println!("{}", cli.get_description().unwrap());
         return Ok(());
     }
-    let zip_file = File::open(&cli.args()[0])?;
+    let mut zip_file = PathBuf::from(&cli.args()[0]);
+    if zip_file.extension().is_none() {
+        zip_file.set_extension("zip");
+    }
+    let zip_file = File::open(&zip_file)?;
     let arc = Archive::try_from(zip_file)?;
     let mut scratch = [0u8; MAX_NAME_LEN];
     let extract = cli.get_opt("e").unwrap() == Some(&OptVal::Empty);
@@ -93,8 +97,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let dir = path.ends_with("/");
         let mut path = PathBuf::from(path);
         if dir {
-            println!("{}", path.to_string_lossy().magenta())
+            println!("          {}", path.to_string_lossy().magenta())
         } else {
+            print!("{:>9} ", entry.uncompressed_size());
             match path
                 .extension()
                 .unwrap_or(OsStr::new(""))
@@ -103,25 +108,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .unwrap_or("")
             {
                 "tar" | "gz" | "xz" | "bz2" | "zip" | "7z" => {
-                    print!("{}", path.to_string_lossy().red())
+                    println!("{}", path.to_string_lossy().red())
                 }
                 // Images
                 "jpg" | "jpeg" | "bmp" | "gif" | "png" => {
-                    print!("{}", path.to_string_lossy().yellow())
+                    println!("{}", path.to_string_lossy().yellow())
                 }
                 "html" | "htm" | "css" | "js" | "ico" => {
-                    print!("{}", path.to_string_lossy().blue().bright())
+                    println!("{}", path.to_string_lossy().blue().bright())
                 }
                 "7b" | "sh" | "rb" | "bat" => {
-                    print!("{}", path.to_string_lossy().gray(12))
+                    println!("{}", path.to_string_lossy().gray(12))
                 }
                 "doc" | "md" | "txt" | "docx" | "pdf" => {
-                    print!("{}", path.to_string_lossy().green())
+                    println!("{}", path.to_string_lossy().green())
                 }
                 // Default: no color for other extensions
-                _ => print!("{}", path.to_string_lossy()),
+                _ => println!("{}", path.to_string_lossy()),
             }
-            println!(" {}", entry.uncompressed_size());
+
             if extract {
                 if !cli.args()[1..].is_empty() {
                     if cli.args()[1..]
