@@ -89,8 +89,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let over = cli.get_opt("w").unwrap() == Some(&OptVal::Empty);
     let exclud = cli.get_opt("x").unwrap() == Some(&OptVal::Empty);
-    println!("  Length      Date    Time    Name");
-    println!("---------  ---------- -----   ----");
+    let listing = cli.get_opt("l").unwrap() == Some(&OptVal::Empty) || !extract;
+    if listing {
+        println!("  Length      Date    Time    Name");
+        println!("---------  ---------- -----   ----");
+    }
     let mut tot_size = 0;
     let mut tot_count = 0;
     for entry in arc.entries() {
@@ -104,135 +107,150 @@ fn main() -> Result<(), Box<dyn Error>> {
         let dir = path.ends_with("/");
         let mut path = PathBuf::from(path);
         let size = entry.uncompressed_size();
-        tot_count += 1;
-        if dir {
-            println!("          {}", path.to_string_lossy().magenta())
+        let date = entry.date();
+        let (day, month, year) = if date > 0 {
+            (date & 0x1f, (date >> 5) & 0xf, ((date >> 9) & 0x7f) + 1980)
         } else {
-            tot_size += size;
-            print!("{:>9} ", size);
-            let date = entry.date();
-            let (day, month, year) = if date > 0 {
-                (date & 0x1f, (date >> 5) & 0xf, ((date >> 9) & 0x7f) + 1980)
-            } else {
-                (0, 0, 0)
-            };
-            let time = entry.time();
-            let (h, m, s) = if time > 0 {
-                (time >> 11, (time >> 4) & 0x1f, (time & 0x1f) >> 1)
-            } else {
-                (0, 0, 0)
-            };
+            (0, 0, 0)
+        };
+        let time = entry.time();
+        let (h, m, s) = if time > 0 {
+            (time >> 11, (time >> 5) & 0x3f, (time & 0x1f) >> 1)
+        } else {
+            (0, 0, 0)
+        };
 
-            if date > 0 {
-                print!("{year:>4}-{month:>02}-{day:>02} ")
+        if listing {
+            tot_count += 1;
+            if dir {
+                println!("{}{}", " ".repeat(30), path.to_string_lossy().magenta())
             } else {
-                print!("           ");
-            }
-            if time > 0 {
-                print!("{h:>2}:{m:>02}:{s:>02} ")
-            } else {
-                print!("         ");
-            }
-            match path
-                .extension()
-                .unwrap_or(OsStr::new(""))
-                .to_ascii_lowercase()
-                .to_str()
-                .unwrap_or("")
-            {
-                "tar" | "gz" | "xz" | "bz2" | "zip" | "7z" => {
-                    println!("{}", path.to_string_lossy().red())
-                }
-                // Images
-                "jpg" | "jpeg" | "bmp" | "gif" | "png" => {
-                    println!("{}", path.to_string_lossy().yellow())
-                }
-                "html" | "htm" | "css" | "js" | "ico" => {
-                    println!("{}", path.to_string_lossy().blue().bright())
-                }
-                "7b" | "sh" | "rb" | "bat" => {
-                    println!("{}", path.to_string_lossy().gray(12))
-                }
-                "doc" | "md" | "txt" | "docx" | "pdf" => {
-                    println!("{}", path.to_string_lossy().green())
-                }
-                // Default: no color for other extensions
-                _ => println!("{}", path.to_string_lossy()),
-            }
+                tot_size += size;
+                print!("{:>9}  ", size);
 
-            if extract {
-                if !cli.args()[1..].is_empty() {
-                    if cli.args()[1..]
-                        .contains(&path.file_name().unwrap().to_str().unwrap().to_string())
-                    {
-                        if exclud {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                }
-
-                if size < max.try_into().unwrap() {
-                    let mut writer = File::options()
-                        .truncate(over)
-                        .write(true)
-                        .create_new(!over)
-                        .create(over)
-                        .open(&path)?;
-                    match entry.compression()? {
-                        Compression::Deflated => {
-                            let mut inbuf = Vec::new();
-                            if let Ok(_comp_size) = entry.reader()?.read_to_end(&mut inbuf) {
-                                let mut decompressor = Decompressor::new();
-                                let mut outbuf = vec![0; size.try_into().unwrap()];
-                                decompressor
-                                    .deflate_decompress(&inbuf, &mut outbuf)
-                                    .unwrap();
-                                path = path.join(&dest);
-                                let parent = path.parent().unwrap();
-                                if !parent.exists() {
-                                    fs::create_dir_all(parent)?
-                                }
-                                io::copy(&mut outbuf.as_slice(), &mut writer)?;
-                            } else {
-                                eprintln!("File {path:?} can't be read from the archive")
-                            }
-                        }
-                        Compression::Stored => {
-                            io::copy(&mut entry.reader()?, &mut writer)?;
-                        }
-                    }
-                    // update timestamp
-                    if year > 0 {
-                        let upd_time = UNIX_EPOCH
-                            + Duration::from_secs(
-                                simtime::seconds_from_epoch(
-                                    1970,
-                                    year as u32,
-                                    month as u32,
-                                    day as u32,
-                                    h as u32,
-                                    m as u32,
-                                    s as u32,
-                                )
-                                .unwrap(),
-                            );
-                        let times = FileTimes::new()
-                            .set_accessed(upd_time)
-                            .set_modified(upd_time);
-                        // Apply the timestamps
-                        writer.set_times(times)?;
-                    }
+                if date > 0 {
+                    print!("{year:>4}-{month:>02}-{day:>02} ")
                 } else {
-                    eprintln!("File {path:?} isn't extracted since the big size")
+                    print!("           ");
+                }
+                if time > 0 {
+                    print!("{h:>2}:{m:>02}   ")
+                } else {
+                    print!("{}", " ".repeat(8));
+                }
+                match path
+                    .extension()
+                    .unwrap_or(OsStr::new(""))
+                    .to_ascii_lowercase()
+                    .to_str()
+                    .unwrap_or("")
+                {
+                    "tar" | "gz" | "xz" | "bz2" | "zip" | "7z" => {
+                        println!("{}", path.to_string_lossy().red())
+                    }
+                    // Images
+                    "jpg" | "jpeg" | "bmp" | "gif" | "png" => {
+                        println!("{}", path.to_string_lossy().yellow())
+                    }
+                    "html" | "htm" | "css" | "js" | "ico" => {
+                        println!("{}", path.to_string_lossy().blue().bright())
+                    }
+                    "7b" | "sh" | "rb" | "bat" => {
+                        println!("{}", path.to_string_lossy().gray(12))
+                    }
+                    "doc" | "md" | "txt" | "docx" | "pdf" => {
+                        println!("{}", path.to_string_lossy().green())
+                    }
+                    // Default: no color for other extensions
+                    _ => println!("{}", path.to_string_lossy()),
                 }
             }
         }
+        if extract {
+            if !cli.args()[1..].is_empty() {
+                if cli.args()[1..]
+                    .contains(&path.file_name().unwrap().to_str().unwrap().to_string())
+                {
+                    if exclud {
+                        continue;
+                    }
+                } else if !exclud {
+                    continue;
+                }
+            }
+            let dest_dir = if let Some(parent) = path.parent() {
+                dest.join(parent)
+            } else {
+                dest.clone()
+            };
+            if !dest_dir.exists() {
+                fs::create_dir_all(dest_dir)?
+            } else if !dest_dir.is_dir() {
+                eprintln!("{dest_dir:?} is a file, entry {path:?} is skipped.")
+            }
+            path = dest.join(path);
+            if size < max.try_into().unwrap() {
+                let Ok(mut writer) = File::options()
+                    .truncate(over)
+                    .write(true)
+                    .create_new(!over)
+                    .create(over)
+                    .open(&path)
+                else {
+                    eprintln!(
+                        "File {} can't be created.",
+                        path.to_string_lossy().red().bold()
+                    );
+                    continue;
+                };
+                match entry.compression()? {
+                    Compression::Deflated => {
+                        let mut inbuf = Vec::new();
+                        if let Ok(_comp_size) = entry.reader()?.read_to_end(&mut inbuf) {
+                            let mut decompressor = Decompressor::new();
+                            let mut outbuf = vec![0; size.try_into().unwrap()];
+                            decompressor
+                                .deflate_decompress(&inbuf, &mut outbuf)
+                                .unwrap();
+                            io::copy(&mut outbuf.as_slice(), &mut writer)?;
+                        } else {
+                            eprintln!("File {path:?} can't be read from the archive")
+                        }
+                    }
+                    Compression::Stored => {
+                        io::copy(&mut entry.reader()?, &mut writer)?;
+                    }
+                }
+                // update timestamp
+                if year > 0 {
+                    let upd_time = UNIX_EPOCH
+                        + Duration::from_secs(
+                            simtime::seconds_from_epoch(
+                                1970,
+                                year as u32,
+                                month as u32,
+                                day as u32,
+                                h as u32,
+                                m as u32,
+                                s as u32,
+                            )
+                            .unwrap(),
+                        );
+                    let times = FileTimes::new()
+                        .set_accessed(upd_time)
+                        .set_modified(upd_time);
+                    // Apply the timestamps
+                    writer.set_times(times)?;
+                }
+            } else {
+                eprintln!("File {path:?} isn't extracted since the big size")
+            }
+        }
     }
-    println!("---------                     -------");
-    println!("{tot_size:>9}                     {tot_count} files");
-
+    if listing {
+        println!("---------                     -------");
+        println!("{tot_size:>9}                     {tot_count} files");
+    }
     Ok(())
 }
 
