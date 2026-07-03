@@ -462,7 +462,7 @@ impl ZipEntry {
                 simtime::get_datetime(1970, self.modified)
             }
         };
-        let time: u16 = (s / 2 + (min << 4) + (h << 11))
+        let time: u16 = (s / 2 + (min << 5) + (h << 11))
             .try_into()
             .map_err(|e| Error::other(format!("because {e}")))?;
         zip_file.write_all(&time.to_ne_bytes())?;
