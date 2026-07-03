@@ -1,6 +1,7 @@
 extern crate libdeflater;
 extern crate simcli;
 extern crate simcolor;
+extern crate simtime;
 use crate::simcolor::Colorized;
 use libdeflater::Decompressor;
 #[cfg(target_os = "windows")]
@@ -9,10 +10,12 @@ use simcli::{CLI, OptTyp, OptVal};
 use std::env;
 use std::error::Error;
 use std::ffi::OsStr;
+use std::fs::FileTimes;
 use std::fs::{self, File};
 use std::io;
 use std::io::Read;
 use std::path::PathBuf;
+use std::time::Duration;
 const MAX_NAME_LEN: usize = 1024;
 use tzip::{Archive, Compression};
 fn main() -> Result<(), Box<dyn Error>> {
@@ -86,6 +89,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let over = cli.get_opt("w").unwrap() == Some(&OptVal::Empty);
     let exclud = cli.get_opt("x").unwrap() == Some(&OptVal::Empty);
+    println!("  Length      Date    Time    Name");
+    println!("---------  ---------- -----   ----");
+    let mut tot_size = 0;
+    let mut tot_count = 0;
     for entry in arc.entries() {
         let entry = entry?;
         let path = entry.read_path(&mut scratch)?;
@@ -96,10 +103,36 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
         let dir = path.ends_with("/");
         let mut path = PathBuf::from(path);
+        let size = entry.uncompressed_size();
+        tot_count += 1;
         if dir {
             println!("          {}", path.to_string_lossy().magenta())
         } else {
-            print!("{:>9} ", entry.uncompressed_size());
+            tot_size += size;
+            print!("{:>9} ", size);
+            let date = entry.date();
+            let (day, month, year) = if date > 0 {
+                (date & 0x1f, (date >> 5) & 0xf, ((date >> 9) & 0x7f) + 1980)
+            } else {
+                (0, 0, 0)
+            };
+            let time = entry.time();
+            let (h, m, s) = if time > 0 {
+                (time >> 11, (time >> 4) & 0x1f, (time & 0x1f) >> 1)
+            } else {
+                (0, 0, 0)
+            };
+
+            if date > 0 {
+                print!("{year:>4}-{month:>02}-{day:>02} ")
+            } else {
+                print!("           ");
+            }
+            if time > 0 {
+                print!("{h:>2}:{m:>02}:{s:>02} ")
+            } else {
+                print!("         ");
+            }
             match path
                 .extension()
                 .unwrap_or(OsStr::new(""))
@@ -139,7 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         continue;
                     }
                 }
-                let size = entry.uncompressed_size();
+
                 if size < max.try_into().unwrap() {
                     let mut writer = File::options()
                         .truncate(over)
@@ -170,12 +203,35 @@ fn main() -> Result<(), Box<dyn Error>> {
                             io::copy(&mut entry.reader()?, &mut writer)?;
                         }
                     }
+                    // update timestamp
+                    if year > 0 {
+                        let upd_time = UNIX_EPOCH
+                            + Duration::from_secs(
+                                simtime::seconds_from_epoch(
+                                    1970,
+                                    year as u32,
+                                    month as u32,
+                                    day as u32,
+                                    h as u32,
+                                    m as u32,
+                                    s as u32,
+                                )
+                                .unwrap(),
+                            );
+                        let times = FileTimes::new()
+                            .set_accessed(upd_time)
+                            .set_modified(upd_time);
+                        // Apply the timestamps
+                        writer.set_times(times)?;
+                    }
                 } else {
                     eprintln!("File {path:?} isn't extracted since the big size")
                 }
             }
         }
     }
+    println!("---------                     -------");
+    println!("{tot_size:>9}                     {tot_count} files");
 
     Ok(())
 }
