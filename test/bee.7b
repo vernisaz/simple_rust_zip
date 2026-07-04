@@ -10,8 +10,18 @@ common_test =..${~/~}..${~/~}simscript${~/~}comm-test.7b:file
 crate_dir=..${~/~}..${~/~}crates
 doc_dir=..${~/~}..${~/~}docs
 
-version=1.02(009)
+version=1.03(010)
 set_env(VERSION,version)
+
+mode=mode:prop
+if {
+	eq(mode,release) then {
+		array(-C,opt-level=3)
+		assign(test opts, ~~)
+		array(-C,opt-level=3)
+		assign(crate opts, ~~)
+	}
+}
 
 include(common);
 include(common_test);

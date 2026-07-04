@@ -223,9 +223,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 // update timestamp
                 if year > 0 {
+                    let (timezone_offset_min, _dst) = simtime::get_local_timezone_offset_dst();
                     let upd_time = UNIX_EPOCH
                         + Duration::from_secs(
-                            simtime::seconds_from_epoch(
+                            (simtime::seconds_from_epoch(
                                 1970,
                                 year as u32,
                                 month as u32,
@@ -234,7 +235,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 m as u32,
                                 s as u32,
                             )
-                            .unwrap(),
+                            .unwrap() as i64
+                                - (timezone_offset_min * 60) as i64)
+                                as u64,
                         );
                     let times = FileTimes::new()
                         .set_accessed(upd_time)

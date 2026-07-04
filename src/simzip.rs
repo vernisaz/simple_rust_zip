@@ -1,6 +1,7 @@
 //! The crate for creation zip files
 #[cfg(feature = "deflate")]
 extern crate libdeflater;
+extern crate simtime;
 use crate::crc32;
 use crate::simzip::Location::Disk;
 use crate::simzip::Location::Mem;
@@ -427,12 +428,14 @@ impl ZipEntry {
 
     fn write_common(&mut self, mut zip_file: &File) -> io::Result<(usize, u64)> {
         let mut res = 0_usize;
+        let (timezone_offset_min, _dst) = simtime::get_local_timezone_offset_dst();
         let (y, m, d, h, min, s, _) = match &self.data {
             Location::Mem(_) => {
                 let current = SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap_or_default();
-                self.modified = current.as_secs() as _;
+                self.modified =
+                    (current.as_secs() as i64 + (timezone_offset_min as i64) * 60) as u64;
                 simtime::get_datetime(1970, self.modified)
             }
             Location::Disk(path) => {
@@ -458,13 +461,12 @@ impl ZipEntry {
                     .modified()?
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .map_err(|e| Error::other(format!("because {e}")))?;
-                self.modified = timestamp.as_secs();
+                self.modified =
+                    (timestamp.as_secs() as i64 + (timezone_offset_min as i64) * 60) as u64;
                 simtime::get_datetime(1970, self.modified)
             }
         };
-        let time: u16 = (s / 2 + (min << 5) + (h << 11))
-            .try_into()
-            .map_err(|e| Error::other(format!("because {e}")))?;
+        let time: u16 = ((s >> 1) | (min << 5) | (h << 11)) as u16;
         zip_file.write_all(&time.to_ne_bytes())?;
         res += 2;
         let date: u16 = (d + (m << 5) + ((y - 1980) << 9))
