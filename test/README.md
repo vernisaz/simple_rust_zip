@@ -15,4 +15,5 @@ The dependencies should be built first.
 
 ## Another use of the test suite
 Since the test utility is capable to extract zip content, it can be used on Windows where no 
-CLI unzip utility by default. 
+CLI unzip utility by default. The *tar* available on Windows is also capable to unzip, however it is
+a direct BSD port and uses BSD/Linux style arguments.
