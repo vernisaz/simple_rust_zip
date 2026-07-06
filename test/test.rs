@@ -6,12 +6,12 @@ use crate::simcolor::Colorized;
 use libdeflater::Decompressor;
 #[cfg(target_os = "windows")]
 use simcli::WildCardExpansion;
-use simcli::{CLI, OptTyp, OptVal};
+use simcli::{CLI, OPT_PREFIX, OptTyp, OptVal};
 use std::env;
 use std::error::Error;
 use std::ffi::OsStr;
-use std::fs::{self, File,FileTimes};
-use std::io::{self,Read};
+use std::fs::{self, File, FileTimes};
+use std::io::{self, Read};
 use std::path::PathBuf;
 use std::time::Duration;
 const MAX_NAME_LEN: usize = 1024;
@@ -26,21 +26,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         .opt("l", OptTyp::None)?
         .alias("-list")?
         .description("Show the archive directory")
-        .opt("m", OptTyp::Num)?
+        .opt("s", OptTyp::Num)?
         .alias("-max")?
-        .description("Max size (in meg) of an extracted file. Should be specified with with -e. Default 32MB.")
+        .description(&format!("Max size (in MB) of an extracted file. Should be specified with with {OPT_PREFIX}e. Default 32MB"))
         .opt("e", OptTyp::None)?
         .alias("-extract")?
-        .description("Extract file if its size is less the max.")
+        .description("Extract a file if its size is less than the max")
         .opt("w", OptTyp::None)?
         .alias("-overwrite")?
-        .description("Overwrite existing files.")
+        .description("Overwrite existing files")
         .opt("o", OptTyp::Str)?
         .alias("-outdir")?
-        .description("Output directory for extracted files.")
+        .description("Output directory for extracted files")
         .opt("x", OptTyp::None)?
         .alias("-exclude")?
-        .description("Provided content entry patterns are considered for exclusion from extraction.");
+        .description("Provided content entry patterns are considered for exclusion from the extraction")
+        .opt("m", OptTyp::None)?
+        .description("Don't restore modification times");
     #[cfg(target_os = "windows")]
     cli.process_wildcard(WildCardExpansion::Once);
     if cli.get_opt("v").unwrap() == Some(&OptVal::Empty) {
@@ -64,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let arc = Archive::try_from(zip_file)?;
     let mut scratch = [0u8; MAX_NAME_LEN];
     let extract = cli.get_opt("e").unwrap() == Some(&OptVal::Empty);
-    let max = if let Some(OptVal::Num(max)) = cli.get_opt("m").unwrap()
+    let max = if let Some(OptVal::Num(max)) = cli.get_opt("s").unwrap()
         && *max > 1
     {
         (*max as usize) * 1024 * 1024
@@ -88,6 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let over = cli.get_opt("w").unwrap() == Some(&OptVal::Empty);
     let exclud = cli.get_opt("x").unwrap() == Some(&OptVal::Empty);
     let listing = cli.get_opt("l").unwrap() == Some(&OptVal::Empty) || !extract;
+    let no_time_restore = cli.get_opt("m").unwrap() == Some(&OptVal::Empty);
     if listing {
         println!("  Length      Date    Time    Name");
         println!("---------  ---------- -----   ----");
@@ -184,7 +187,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             if !dest_dir.exists() {
                 fs::create_dir_all(dest_dir)?
             } else if !dest_dir.is_dir() {
-                eprintln!("{dest_dir:?} is a file, entry {path:?} is skipped.")
+                eprintln!("{dest_dir:?} is a file, entry {path:?} is skipped")
             }
             path = dest.join(path);
             if size < max.try_into().unwrap() {
@@ -220,7 +223,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
                 // update timestamp
-                if year > 0 {
+                if !no_time_restore && year > 0 {
                     let (timezone_offset_min, _dst) = simtime::get_local_timezone_offset_dst();
                     let upd_time = UNIX_EPOCH
                         + Duration::from_secs(
@@ -244,7 +247,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     writer.set_times(times)?;
                 }
             } else {
-                eprintln!("File {path:?} isn't extracted since the big size")
+                eprintln!("File {path:?} isn't extracted since the size is greater than allowed")
             }
         }
     }
