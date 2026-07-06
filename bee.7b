@@ -6,7 +6,7 @@ use deflater=true
 unix test=!true
 
 feat=[]
-version=1.13b28
+version=1.14b29
 set_env(VERSION,version)
 
 absolute(crate_dir)
@@ -16,7 +16,13 @@ target test {
 	dependency{target(compile test)}
 	dependency{}
 	exec src/test (~args~)
-	exec unzip(-t,test)
+	if {
+		eq(~os~,windows) then {
+			exec tar(-tf,test.zip)
+		} else {
+			exec unzip(-t,test)
+		}
+	}
 }
 
 target compile test:src {
