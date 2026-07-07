@@ -72,4 +72,5 @@ a precompiled object files included in the deflat repository.
 
 1. More compressing algorithms (including encryption) can be added in the future.
 2. Releasing the limitation having ZIP file under 2 GB, and adding 64 bit format support.
-3. Adding unzipping capabilities.
+3. Adding unzipping capabilities (Check out [unzip test utility](./test/README.md) for the current
+unzipping capabilities).
