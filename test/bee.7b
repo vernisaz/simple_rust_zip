@@ -24,5 +24,15 @@ if {
 	}
 }
 
+target package {
+	dependency {
+        target(build)
+    }
+	dependency{true}
+	zip(.${~/~}simzip-${version}.zip,
+	-B simzip,
+	dirzip${t_ext})
+}
+
 include(common);
 include(common_test);
