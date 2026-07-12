@@ -4,8 +4,6 @@ extern crate simcolor;
 extern crate simtime;
 use crate::simcolor::Colorized;
 use libdeflater::Decompressor;
-#[cfg(target_os = "windows")]
-use simcli::WildCardExpansion;
 use simcli::{CLI, OPT_PREFIX, OptTyp, OptVal};
 use std::env;
 use std::error::Error;
@@ -44,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .opt("m", OptTyp::None)?
         .description("Don't restore modification times");
     #[cfg(target_os = "windows")]
-    cli.process_wildcard(WildCardExpansion::Once);
+    cli.wildcard_for_first();
     if cli.get_opt("v").unwrap() == Some(&OptVal::Empty) {
         println!(
             "Zipdir version {} © {} D. Rogatkin",
@@ -53,7 +51,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         return Ok(());
     }
-    if cli.args().is_empty() || cli.get_opt("h").unwrap() == Some(&OptVal::Empty) {
+
+   if cli.args().is_empty() || cli.get_opt("h").unwrap() == Some(&OptVal::Empty) {
         println!("Usage: zipdir [opts] <file> [<content_file>...]");
         println!("{}", cli.get_description().unwrap());
         return Ok(());
@@ -169,8 +168,30 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         if extract {
             if !cli.args()[1..].is_empty() {
-                if cli.args()[1..]
-                    .contains(&path.file_name().unwrap().to_str().unwrap().to_string())
+                #[cfg(target_os = "windows")]
+                let name = path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_ascii_lowercase();
+                #[cfg(not(target_os = "windows"))]
+                let name = path.file_name().unwrap().to_str().unwrap();
+                if cli
+                    .args()[1..]
+                    .iter()
+                    .find(|&el| {
+                        if let Some((before, after)) = el.split_once('*') {
+                            #[cfg(target_os = "windows")]
+                            let before = before.to_ascii_lowercase();
+                            #[cfg(target_os = "windows")]
+                            let after = after.to_ascii_lowercase();
+                            name.starts_with(&before) && name.ends_with(&after)
+                        } else {
+                            name == *el
+                        }
+                    })
+                    .is_some()
                 {
                     if exclud {
                         continue;
