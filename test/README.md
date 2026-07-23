@@ -1,7 +1,7 @@
 # Test zipping capabilities by unzipping
 
 This test utilty allows to test an integrity of a generated zip file by showing its directory
-and also extract its content. It is based on [tinyzip](https://github.com/lovasoa/tinyzip).
+and also extracting its content. It is based on [tinyzip](https://github.com/lovasoa/tinyzip).
 You need to copy *.7b*, *diff*, and *.rs* in the _tinyzip_ root directory, apply `git apply diff`, and then execute `rb`.
 
 ## Dependencies
