@@ -18,10 +18,7 @@ test.zip"#
     #[cfg(feature = "test_unix")]
     {
         zip.add(simzip::ZipEntry::from_file("run script.sh", Some("test")));
-        zip.add(simzip::ZipEntry::from_file(
-            "read only.txt",
-            Some(&"test".to_string()),
-        ));
+        zip.add(simzip::ZipEntry::from_file("read only.txt", Some("test")));
     }
     match zip.store() {
         Ok(()) => println! {"Zipped good!"},

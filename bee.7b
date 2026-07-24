@@ -14,6 +14,7 @@ assign(crate_dir,~~)
 
 target test {
 	dependency{target(compile test)}
+	dependency{target(test supplement)}
 	dependency{}
 	exec src/test (~args~)
 	if {
@@ -21,6 +22,24 @@ target test {
 			exec tar(-tf,test.zip)
 		} else {
 			exec unzip(-t,test)
+		}
+	}
+}
+
+target test supplement::creation test files {
+	dependency { eq { timestamp(run script.sh) } } 
+	dependency { eq {timestamp(read only.txt)} }
+	dependency { or{eq(unix test, true)} }
+
+	if {
+		eq(unix test, true) then {
+			display(Creating test files...)
+			write(run script.sh, "#!/bin/bash
+dir")
+            exec chmod (+x, run script.sh)
+            write(read only.txt, "This file is read only
+Do not try to modify")
+            exec chmod (444, read only.txt)
 		}
 	}
 }
