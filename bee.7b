@@ -38,9 +38,8 @@ target test supplement::creation test files {
 dir")
             exec chmod (+x, run script.sh)
             timestamp(read only.txt)
-            not(~~);
             if {
-            	 or(~~) then {
+            	 not(~~) then {
             		write(read only.txt, "This file is read only
 Do not try to modify")
                     exec chmod (444, read only.txt)
