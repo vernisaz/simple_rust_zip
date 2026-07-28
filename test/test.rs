@@ -99,7 +99,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if comm_len > 0 {
             let mut buf = vec![0u8; comm_len.into()];
             arc.read_after_end_exact(22, &mut buf)?;
-            eprintln!("{}", std::string::String::from_utf8_lossy(&buf));
+            println!("{}", std::string::String::from_utf8_lossy(&buf));
         }
         println!("  Length      Date    Time    Name");
         println!("---------  ---------- -----   ----");
