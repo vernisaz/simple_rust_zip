@@ -175,6 +175,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     _ => println!("{}", path.to_string_lossy()),
                 }
             }
+            if let Ok(buf) = entry.read_comment(&mut scratch) {
+                println!("{}", String::from_utf8_lossy(buf))
+            }
         }
         if extract {
             if !cli.args()[1..].is_empty() {

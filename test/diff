@@ -1,5 +1,5 @@
 diff --git a/src/lib.rs b/src/lib.rs
-index a5ca2aa..8f110d0 100644
+index a5ca2aa..74d079d 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
 @@ -330,6 +330,13 @@ impl<R: Reader> Archive<R> {
@@ -16,7 +16,7 @@ index a5ca2aa..8f110d0 100644
  }
  
  /// Forward-only iterator over archive entries.
-@@ -372,6 +379,8 @@ pub struct Entry<'a, R> {
+@@ -372,10 +379,13 @@ pub struct Entry<'a, R> {
      name_range: Range<u64>,
      flags: u16,
      compression_method: u16,
@@ -25,7 +25,25 @@ index a5ca2aa..8f110d0 100644
      crc32: u32,
      compressed_size: u64,
      uncompressed_size: u64,
-@@ -451,6 +460,8 @@ impl<'a, R: Reader> Entry<'a, R> {
+     local_header_offset: u64,
++    comment_range: Option<Range<u64>>,
+ }
+ 
+ impl<'a, R: Reader> Entry<'a, R> {
+@@ -408,6 +418,12 @@ impl<'a, R: Reader> Entry<'a, R> {
+         let name_range = (header_offset + CENTRAL_HEADER_LEN as u64)
+             ..(header_offset + CENTRAL_HEADER_LEN as u64 + name_len);
+         let extra_range = name_range.end..name_range.end + extra_len;
++        let comment_range = if comment_len > 0 {
++            Some((header_offset + CENTRAL_HEADER_LEN as u64 + extra_len + name_len)
++            ..(header_offset + CENTRAL_HEADER_LEN as u64 + extra_len + name_len + comment_len))
++        } else {
++            None
++        };
+ 
+         let raw_compressed_size = le_bytes!(u32, &header[20..24]);
+         let raw_uncompressed_size = le_bytes!(u32, &header[24..28]);
+@@ -451,10 +467,13 @@ impl<'a, R: Reader> Entry<'a, R> {
              name_range,
              flags,
              compression_method,
@@ -34,7 +52,12 @@ index a5ca2aa..8f110d0 100644
              crc32: le_bytes!(u32, &header[16..20]),
              compressed_size,
              uncompressed_size,
-@@ -498,6 +509,18 @@ impl<'a, R: Reader> Entry<'a, R> {
+             local_header_offset,
++            comment_range,
+         };
+         Ok((entry, next_offset))
+     }
+@@ -498,6 +517,18 @@ impl<'a, R: Reader> Entry<'a, R> {
      pub fn crc32(&self) -> u32 {
          self.crc32
      }
@@ -53,3 +76,24 @@ index a5ca2aa..8f110d0 100644
  
      /// Returns the compressed payload size in bytes.
      #[must_use]
+@@ -528,6 +559,20 @@ impl<'a, R: Reader> Entry<'a, R> {
+     pub fn read_path<'b>(&self, buf: &'b mut [u8]) -> Result<&'b [u8], Error<R::Error>> {
+         read_variable_range(self.archive, self.name_range.clone(), buf)
+     }
++    
++    /// Reads the central-directory entry comment into `buf`.
++    ///
++    ///
++    /// # Errors
++    ///
++    /// Returns [`Error::InvalidOffset`] if `buf` is too small or the entry range is
++    /// inconsistent, and [`Error::Io`] if the underlying read fails.
++    pub fn read_comment<'b>(&self, buf: &'b mut [u8]) -> Result<&'b [u8], Error<R::Error>> {
++        match &self.comment_range {
++            None => Err(Error::NotFound),
++            Some(range) => read_variable_range(self.archive, range.clone(), buf)
++        }
++    }
+ 
+     /// Returns whether the central-directory general-purpose bit flag declares
+     /// the entry path to be UTF-8 encoded.

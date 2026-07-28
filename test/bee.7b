@@ -10,7 +10,7 @@ common_test =..${~/~}..${~/~}simscript${~/~}comm-test.7b:file
 crate_dir=..${~/~}..${~/~}crates
 doc_dir=..${~/~}..${~/~}docs
 
-version=1.06(015)
+version=1.07(016)
 set_env(VERSION,version)
 test=.${~/~}dirzip${t_ext}
 
