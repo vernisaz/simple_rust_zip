@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .description("Output directory for extracted files")
         .opt("x", OptTyp::None)?
         .alias("-exclude")?
-        .description("Provided content entry patterns are considered for exclusion from the extraction")
+        .description("Skip files from the extraction that match pattern")
         .opt("m", OptTyp::None)?
         .description("Don't restore modification times");
     #[cfg(target_os = "windows")]
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-   if cli.args().is_empty() || cli.get_opt("h").unwrap() == Some(&OptVal::Empty) {
+    if cli.args().is_empty() || cli.get_opt("h").unwrap() == Some(&OptVal::Empty) {
         println!("Usage: zipdir [opts] <file> [<content_file>...]");
         println!("{}", cli.get_description().unwrap());
         return Ok(());
@@ -91,6 +91,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let listing = cli.get_opt("l").unwrap() == Some(&OptVal::Empty) || !extract;
     let no_time_restore = cli.get_opt("m").unwrap() == Some(&OptVal::Empty);
     if listing {
+        // read comments len
+        let mut buf = [0u8; 2];
+        arc.read_after_end_exact(20, &mut buf)?;
+
+        let comm_len = u16::from_ne_bytes(buf);
+        if comm_len > 0 {
+            let mut buf = vec![0u8; comm_len.into()];
+            arc.read_after_end_exact(22, &mut buf)?;
+            eprintln!("{}", std::string::String::from_utf8_lossy(&buf));
+        }
         println!("  Length      Date    Time    Name");
         println!("---------  ---------- -----   ----");
     }
@@ -177,8 +187,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .to_ascii_lowercase();
                 #[cfg(not(target_os = "windows"))]
                 let name = path.file_name().unwrap().to_str().unwrap();
-                if cli
-                    .args()[1..]
+                if cli.args()[1..]
                     .iter()
                     .find(|&el| {
                         if let Some((before, after)) = el.split_once('*') {
@@ -186,7 +195,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             let before = before.to_ascii_lowercase();
                             #[cfg(target_os = "windows")]
                             let after = after.to_ascii_lowercase();
-                            name.starts_with(before) && name.ends_with(after)
+                            name.starts_with(&before) && name.ends_with(&after)
                         } else {
                             name == *el
                         }

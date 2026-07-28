@@ -1,8 +1,22 @@
 diff --git a/src/lib.rs b/src/lib.rs
-index a5ca2aa..ff40fa4 100644
+index a5ca2aa..8f110d0 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -372,6 +372,8 @@ pub struct Entry<'a, R> {
+@@ -330,6 +330,13 @@ impl<R: Reader> Archive<R> {
+         }
+         self.reader.read_exact_at(pos, buf).map_err(Error::Io)
+     }
++    
++    /// Reads after the central directory end.
++    ///
++    pub fn read_after_end_exact(&self, pos: u64, buf: &mut [u8]) -> Result<(), Error<R::Error>> {
++        self.read_exact_at(self.directory_end_offset + pos, buf)
++    }
++    
+ }
+ 
+ /// Forward-only iterator over archive entries.
+@@ -372,6 +379,8 @@ pub struct Entry<'a, R> {
      name_range: Range<u64>,
      flags: u16,
      compression_method: u16,
@@ -11,7 +25,7 @@ index a5ca2aa..ff40fa4 100644
      crc32: u32,
      compressed_size: u64,
      uncompressed_size: u64,
-@@ -451,6 +453,8 @@ impl<'a, R: Reader> Entry<'a, R> {
+@@ -451,6 +460,8 @@ impl<'a, R: Reader> Entry<'a, R> {
              name_range,
              flags,
              compression_method,
@@ -20,7 +34,7 @@ index a5ca2aa..ff40fa4 100644
              crc32: le_bytes!(u32, &header[16..20]),
              compressed_size,
              uncompressed_size,
-@@ -498,6 +502,18 @@ impl<'a, R: Reader> Entry<'a, R> {
+@@ -498,6 +509,18 @@ impl<'a, R: Reader> Entry<'a, R> {
      pub fn crc32(&self) -> u32 {
          self.crc32
      }
