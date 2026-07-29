@@ -1,4 +1,5 @@
 //! The crate for creation zip files
+#![deny(missing_docs)]
 #[cfg(feature = "deflate")]
 extern crate libdeflater;
 extern crate simtime;
@@ -19,22 +20,35 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+/// Compression algorthm
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum Compression {
+    /// only store
     #[cfg_attr(not(feature = "deflate"), default)]
     Store,
+    /// shrink
     Shrink,
+    /// reduction 1
     Reduction1,
+    /// reduction 2
     Reduction2,
+    /// reduction 3
     Reduction3,
+    /// reduction 4
     Reduction4,
+    /// implode
     Implode,
+    /// deflate
     #[cfg_attr(feature = "deflate", default)]
     Deflate,
+    /// deflate 64
     Deflat64,
+    /// bzip
     BZIP2,
+    /// lzma
     LZMA,
+    /// ppmd
     PPMd,
 }
 
@@ -50,9 +64,12 @@ impl Default for Location {
     }
 }
 
+/// Zip entry attributes
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum Attribute {
+    /// executable
     Exec,
+    /// read only
     NoWrite,
 }
 
@@ -62,12 +79,18 @@ struct DirEntry {
     path: Option<String>,
 }
 
+/// Specifies Zip entry
 #[derive(Debug, Default)]
 pub struct ZipEntry {
+    /// an entry name
     pub name: String,
+    /// an optional path
     pub path: Option<String>,
+    /// an optional comment
     pub comment: Option<String>,
+    /// attributes
     pub attributes: HashSet<Attribute>,
+    /// compression algorithm
     pub compression: Compression,
     data: Location, // includes len uncompressed (original)
     len: u32,       // compressed TODO change to usize or a custom type
@@ -85,10 +108,13 @@ pub struct ZipEntry {
                           // #[cfg(target_os = "windows")]
 }
 
+/// Keeps information about zip file
 #[derive(Default)]
 pub struct ZipInfo {
+    /// Zip file name
     pub zip_name: PathBuf,
     directory: Option<HashSet<DirEntry>>,
+    /// Zip file comment
     pub comment: Option<String>,
     entries: Vec<ZipEntry>,
 }
