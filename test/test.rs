@@ -198,7 +198,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                             let before = before.to_ascii_lowercase();
                             #[cfg(target_os = "windows")]
                             let after = after.to_ascii_lowercase();
-                            name.starts_with(before) && name.ends_with(after)
+                            #[cfg(target_os = "windows")]
+                            {
+                                name.starts_with(&before) && name.ends_with(&after)
+                            }
+                            #[cfg(not(target_os = "windows"))]
+                            {
+                                name.starts_with(before) && name.ends_with(after)
+                            }
                         } else {
                             name == *el
                         }
