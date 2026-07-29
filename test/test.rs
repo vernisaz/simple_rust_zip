@@ -192,22 +192,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let name = path.file_name().unwrap().to_str().unwrap();
                 if cli.args()[1..]
                     .iter()
-                    .find(|&el| {
+                    .find(|el| {
+                        #[cfg(target_os = "windows")]
+                        let el = el.to_ascii_lowercase();
                         if let Some((before, after)) = el.split_once('*') {
-                            #[cfg(target_os = "windows")]
-                            let before = before.to_ascii_lowercase();
-                            #[cfg(target_os = "windows")]
-                            let after = after.to_ascii_lowercase();
-                            #[cfg(target_os = "windows")]
-                            {
-                                name.starts_with(&before) && name.ends_with(&after)
-                            }
-                            #[cfg(not(target_os = "windows"))]
-                            {
-                                name.starts_with(before) && name.ends_with(after)
-                            }
+                            name.starts_with(before) && name.ends_with(after)
                         } else {
-                            name == *el
+                            name == el
                         }
                     })
                     .is_some()
