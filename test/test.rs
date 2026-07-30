@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     cli.wildcard_for_first();
     if cli.get_opt("v").unwrap() == Some(&OptVal::Empty) {
         println!(
-            "Zipdir version {} © {} D. Rogatkin",
+            "Dirzip version {} © {} D. Rogatkin",
             env!("VERSION"),
             year_now()
         );
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if cli.args().is_empty() || cli.get_opt("h").unwrap() == Some(&OptVal::Empty) {
-        println!("Usage: zipdir [opts] <file> [<content_file>...]");
+        println!("Usage: dirzip [opts] <file> [<content_file>...]");
         println!("{}", cli.get_description().unwrap());
         return Ok(());
     }
